@@ -3,26 +3,34 @@ import { checkPublication } from "./content-import.js";
 export const NOTE_FILE = /\.(md|wiki|txt)$/i;
 export const IMAGE_FILE = /\.(png|jpe?g|gif|webp|svg)$/i;
 
-// ファイル名が「別のファイル名の一部」ではなく、それ自体として書かれているか。
-// 「大地図.png」と書いてあっても「地図.png」は参照していないとみなす
-// 「map.png.webp」と書いてあっても「map.png」は参照していないとみなす (前後の両方を確認する)
-const FILE_NAME_START_BOUNDARY = /[\s[|=:/(（「『>"'*]/;
-const FILE_NAME_END_BOUNDARY = /[\s\]|)）」』<"'*#,、。;]/;
+// 画像のパスやファイル名が、別の名前の一部ではなくそれ自体として書かれているか。前後の両方を確認する:
+// - 直前は区切り文字のみ。/ は含めない (「別フォルダ/map.png」を map.png への参照とみなさない。
+//   「大地図.png」も「地図.png」への参照ではない)
+// - 直後は改行・閉じ括弧・区切り記号のみ。空白は含めない
+//   (「map.png.webp」や「map.png draft.png」の途中で map.png に一致させない)
+const NAME_START_BOUNDARY = /[\s[|=:(（「『>"'*]/;
+const NAME_END_BOUNDARY = /[\r\n\t\]|)）」』<"'*#,、。;]/;
 
-function mentionsFileName(text, fileName) {
-  let index = text.indexOf(fileName);
+function mentions(text, needle) {
+  let index = text.indexOf(needle);
   while (index !== -1) {
     const before = text[index - 1];
-    const after = text[index + fileName.length];
+    const after = text[index + needle.length];
     if (
-      (before === undefined || FILE_NAME_START_BOUNDARY.test(before)) &&
-      (after === undefined || FILE_NAME_END_BOUNDARY.test(after))
+      (before === undefined || NAME_START_BOUNDARY.test(before)) &&
+      (after === undefined || NAME_END_BOUNDARY.test(after))
     ) {
       return true;
     }
-    index = text.indexOf(fileName, index + 1);
+    index = text.indexOf(needle, index + 1);
   }
   return false;
+}
+
+// 画像が原稿から参照されているか。保管庫からのパス (画像/map.png) か、ファイル名だけ (map.png) で書かれていれば参照とみなす
+function referencesImage(text, imagePath) {
+  const fileName = imagePath.split("/").pop();
+  return (imagePath !== fileName && mentions(text, imagePath)) || mentions(text, fileName);
 }
 
 // 保管庫のファイル一覧から、content/ にコピーするものを決める。
@@ -43,10 +51,9 @@ export function selectPublishedFiles(notes, imagePaths) {
     }
   }
 
-  const images = imagePaths.filter((imagePath) => {
-    const fileName = imagePath.split("/").pop();
-    return publishedNotes.some((note) => mentionsFileName(note.text, fileName));
-  });
+  const images = imagePaths.filter((imagePath) =>
+    publishedNotes.some((note) => referencesImage(note.text, imagePath))
+  );
 
   return {
     files: [...publishedNotes.map((note) => note.path), ...images].sort(),

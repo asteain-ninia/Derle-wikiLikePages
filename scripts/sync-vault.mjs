@@ -79,9 +79,25 @@ function isInside(childPath, parentPath) {
 
 // content/ を消したり書き換えたりする前に、保管庫と取り違えていないことを確かめる。
 // content/ がリンク (ジャンクション) だと、ミラーの削除が保管庫の正本に及ぶため止める
+async function assertNoLinksInside(directoryPath) {
+  for (const entry of await readdir(directoryPath, { withFileTypes: true })) {
+    const entryPath = path.join(directoryPath, entry.name);
+    if (entry.isSymbolicLink()) {
+      throw new Error(`content/ の中にリンク (ジャンクション) があります: ${entryPath}`);
+    }
+    if (entry.isDirectory()) {
+      await assertNoLinksInside(entryPath);
+    }
+  }
+}
+
 async function assertSafeLocations(vaultPath) {
-  if (existsSync(contentRoot) && (await lstat(contentRoot)).isSymbolicLink()) {
-    throw new Error(`content/ がリンク (ジャンクション) になっています: ${contentRoot}`);
+  if (existsSync(contentRoot)) {
+    if ((await lstat(contentRoot)).isSymbolicLink()) {
+      throw new Error(`content/ がリンク (ジャンクション) になっています: ${contentRoot}`);
+    }
+    // 中にリンクがあると、書き込みや削除がリンク先 (保管庫など) に及ぶ
+    await assertNoLinksInside(contentRoot);
   }
 
   const realVault = await realpath(vaultPath);

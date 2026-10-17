@@ -21,9 +21,9 @@ test("selectPublishedFiles keeps only 公開: true notes and the images they men
 
 test("selectPublishedFiles does not treat a longer file name as a mention of a shorter one", () => {
   const notes = [{ path: "公開.md", text: "---\n公開: true\n---\n![[大地図.png]] と [[File:画像/位置.png|100px]] と |国旗画像=国旗.png" }];
-  const images = ["地図.png", "大地図.png", "位置.png", "国旗.png", "旗.png"];
+  const images = ["地図.png", "大地図.png", "画像/位置.png", "国旗.png", "旗.png"];
 
-  assert.deepEqual(selectPublishedFiles(notes, images).files, ["位置.png", "公開.md", "国旗.png", "大地図.png"]);
+  assert.deepEqual(selectPublishedFiles(notes, images).files, ["公開.md", "国旗.png", "大地図.png", "画像/位置.png"]);
 });
 
 test("selectPublishedFiles checks the boundary after the file name too", () => {
@@ -33,4 +33,11 @@ test("selectPublishedFiles checks the boundary after the file name too", () => {
     "river.png",
     "公開.md",
   ]);
+});
+
+test("selectPublishedFiles distinguishes same-named images in different folders and names with spaces", () => {
+  const notes = [{ path: "公開.md", text: "---\n公開: true\n---\n![[公開用/map.png]]\n![[river.png draft.png]]" }];
+  const images = ["公開用/map.png", "非公開/map.png", "river.png", "river.png draft.png"];
+
+  assert.deepEqual(selectPublishedFiles(notes, images).files, ["river.png draft.png", "公開.md", "公開用/map.png"]);
 });
