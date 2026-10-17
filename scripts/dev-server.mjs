@@ -1,9 +1,11 @@
 import { execFile } from "node:child_process";
-import { watch } from "node:fs";
+import { existsSync, mkdirSync, watch } from "node:fs";
 import { createServer } from "node:http";
 import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
+import { resolveVaultPath, syncVault } from "./sync-vault.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -113,7 +115,37 @@ function scheduleRebuild() {
 }
 
 for (const directory of watchedDirectories) {
+  mkdirSync(directory, { recursive: true });
   watch(directory, { recursive: true }, scheduleRebuild);
+}
+
+// 保管庫の場所が設定されていれば保管庫も監視し、保存のたびに npm run sync 相当を走らせる。
+// sync が content/ を書き換えると、上の監視でビルドとブラウザの再読み込みが続く。
+let vaultPath = null;
+try {
+  vaultPath = await resolveVaultPath();
+} catch {
+  // 未設定なら content/ だけを監視する
+}
+
+let syncTimer = null;
+function scheduleSync() {
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(() => {
+    syncVault({ log: (message) => console.log(message) }).catch((error) => {
+      console.error(`[sync] 失敗しました: ${error.message}`);
+    });
+  }, 300);
+}
+
+if (vaultPath && existsSync(vaultPath)) {
+  watch(vaultPath, { recursive: true }, (_eventType, fileName) => {
+    // .obsidian/ (ワークスペースの状態など) や .git/ の変更では同期しない
+    if (fileName && String(fileName).split(/[\\/]/).some((segment) => segment.startsWith("."))) {
+      return;
+    }
+    scheduleSync();
+  });
 }
 
 const server = createServer(async (request, response) => {
@@ -159,9 +191,19 @@ const server = createServer(async (request, response) => {
   }
 });
 
+// 起動時は同期で何も変わらなくても一度はビルドする
+if (vaultPath && existsSync(vaultPath)) {
+  await syncVault({ log: (message) => console.log(message) }).catch((error) => {
+    console.error(`[sync] 失敗しました: ${error.message}`);
+  });
+}
 rebuildContent();
 
 server.listen(port, host, () => {
   console.log(`WikiLikePages dev server: http://localhost:${port}`);
-  console.log("content/ の変更を監視しています。保存するとビルドしてブラウザを再読み込みします。");
+  console.log(
+    vaultPath && existsSync(vaultPath)
+      ? `保管庫 (${vaultPath}) を監視しています。保存すると同期・ビルドしてブラウザを再読み込みします。`
+      : "content/ の変更を監視しています。保存するとビルドしてブラウザを再読み込みします。"
+  );
 });

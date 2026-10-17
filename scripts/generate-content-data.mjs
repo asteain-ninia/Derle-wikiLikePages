@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import {
   buildArticleRecord,
   findDuplicateEntryIds,
-  getUnpublishedReason,
+  checkPublication,
 } from "../src/lib/content-import.js";
 import { loadTemplateHandlers } from "../src/lib/template-registry.js";
 
@@ -139,10 +139,9 @@ async function buildContentData() {
   const markdownFiles = allFiles.filter((filePath) => CONTENT_FILE_EXTENSIONS.test(filePath));
   const templateHandlers = await loadTemplateHandlers(templatesDir);
   const entries = [];
-  // 記事でも画像でもないファイル (辞書 json・docx・Obsidian の .base など) は公開しない
-  const unpublishedPaths = allFiles
-    .filter((filePath) => !CONTENT_FILE_EXTENSIONS.test(filePath) && !IMAGE_FILE_EXTENSIONS.test(filePath))
-    .map((filePath) => toPosixPath(path.relative(projectRoot, filePath)));
+  // content/ は npm run sync が公開する原稿だけを置く場所だが、手で置かれた原稿なども
+  // 公開: true が無ければ載せない (念のための確認)
+  const skippedPaths = [];
 
   // 画像のファイル名 → content/ からのパス (同名の画像が複数あれば先に見つかった方)
   const assetPathsByName = new Map();
@@ -160,13 +159,9 @@ async function buildContentData() {
     const repoRelativePath = toPosixPath(path.relative(projectRoot, absolutePath));
     const fileBasename = path.basename(absolutePath, path.extname(absolutePath));
     const sourceText = await readFile(absolutePath, "utf8");
-    const unpublishedReason = getUnpublishedReason(sourceText);
-    if (unpublishedReason) {
-      unpublishedPaths.push(repoRelativePath);
-      // 未査読スタブは数が多く想定どおりなので黙って除外し、それ以外は気づけるように名前を出す
-      if (unpublishedReason !== "未査読") {
-        console.log(`  非公開: ${relativeToContent} (${unpublishedReason})`);
-      }
+    if (!checkPublication(sourceText).published) {
+      skippedPaths.push(relativeToContent);
+      console.log(`  公開: true が無いため載せません: ${relativeToContent}`);
       continue;
     }
 
@@ -199,61 +194,14 @@ async function buildContentData() {
   const publishedEntries = entries.filter((entry) => !entry.draft);
 
   return {
-    unpublishedPaths,
     contentBuildInfo: {
       totalMarkdownFiles: markdownFiles.length,
-      unpublishedFileCount: unpublishedPaths.length,
+      skippedFileCount: skippedPaths.length,
       publishedArticleCount: publishedEntries.length,
       generatedAt: new Date().toISOString(),
     },
     generatedArticles: sortEntries(publishedEntries),
   };
-}
-
-const EXCLUDE_BLOCK_START = "# >>> build:content が自動生成: 非公開の原稿 (手で編集しない) >>>";
-const EXCLUDE_BLOCK_END = "# <<< build:content <<<";
-
-function escapeGitignorePath(repoRelativePath) {
-  return `/${repoRelativePath.replace(/[\\*?[\]!#]/g, "\\$&")}`;
-}
-
-// 非公開の原稿を .git/info/exclude に載せ、うっかりコミットされないようにする。
-// リポジトリに含まれる .gitignore ではなくローカル専用の exclude を使うのは、
-// 未公開記事のファイル名 (= タイトル) を公開リポジトリに出さないため。
-async function updateGitExclude(unpublishedPaths) {
-  let excludePath;
-  try {
-    excludePath = path.resolve(
-      projectRoot,
-      execFileSync("git", ["rev-parse", "--git-path", "info/exclude"], {
-        cwd: projectRoot,
-        encoding: "utf8",
-        stdio: ["ignore", "pipe", "ignore"],
-      }).trim()
-    );
-  } catch {
-    return;
-  }
-
-  let current = "";
-  try {
-    current = await readFile(excludePath, "utf8");
-  } catch {
-    // exclude がまだ無ければ新規に作る
-  }
-
-  const blockPattern = new RegExp(
-    `\\n?${EXCLUDE_BLOCK_START.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[\\s\\S]*?${EXCLUDE_BLOCK_END.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\n?`
-  );
-  const withoutBlock = current.replace(blockPattern, "\n").replace(/\n+$/, "");
-  const block = [
-    EXCLUDE_BLOCK_START,
-    ...[...unpublishedPaths].sort().map(escapeGitignorePath),
-    EXCLUDE_BLOCK_END,
-  ].join("\n");
-
-  await mkdir(path.dirname(excludePath), { recursive: true });
-  await writeFile(excludePath, `${withoutBlock ? `${withoutBlock}\n\n` : ""}${block}\n`, "utf8");
 }
 
 function serializeModule({ contentBuildInfo, generatedArticles }) {
@@ -263,9 +211,7 @@ function serializeModule({ contentBuildInfo, generatedArticles }) {
 const contentData = await buildContentData();
 await mkdir(generatedDataDir, { recursive: true });
 await writeFile(generatedDataPath, serializeModule(contentData), "utf8");
-await updateGitExclude(contentData.unpublishedPaths);
 
 console.log(
-  `Generated ${contentData.generatedArticles.length} article records at ${path.relative(projectRoot, generatedDataPath)}` +
-    ` (非公開 ${contentData.unpublishedPaths.length} 件は除外)`
+  `Generated ${contentData.generatedArticles.length} article records at ${path.relative(projectRoot, generatedDataPath)}`
 );

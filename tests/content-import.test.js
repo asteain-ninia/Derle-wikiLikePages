@@ -5,8 +5,7 @@ import {
   buildArticleRecord,
   extractLeadingTemplates,
   findDuplicateEntryIds,
-  getUnpublishedReason,
-  UNSUPPORTED_FRONTMATTER,
+  checkPublication,
   parseFrontmatter,
   parseMarkdownSections,
 } from "../src/lib/content-import.js";
@@ -591,63 +590,9 @@ test("parseFrontmatter reads Japanese keys", () => {
   assert.equal(data["公開"], false);
 });
 
-test("getUnpublishedReason detects unreviewed stubs, meta notes and opt-out notes", () => {
-  assert.equal(getUnpublishedReason("---\n種別: 国\n---\n> [!caution] 未査読\n> 下書き\n\n本文"), "未査読");
-  assert.equal(getUnpublishedReason("---\r\n種別: 地形\r\n---\r\n> [!caution] 未査読\r\n本文"), "未査読");
-  assert.equal(getUnpublishedReason("---\n種別: メタ\n---\n# 規約"), "種別: メタ");
-  assert.equal(getUnpublishedReason("---\n公開: false\n---\n書きかけ"), "公開: false");
-  assert.equal(getUnpublishedReason("---\n種別: 国\n---\n本文で未査読という語に触れるだけ"), null);
-  assert.equal(getUnpublishedReason("frontmatter なしの本文"), null);
-});
-
-test("getUnpublishedReason is not fooled by a BOM, trailing YAML comments or callout variants", () => {
-  assert.equal(getUnpublishedReason("\uFEFF---\n公開: false\n---\n書きかけ"), "公開: false");
-  assert.equal(getUnpublishedReason("\uFEFF> [!caution] 未査読\n本文"), "未査読");
-  assert.equal(getUnpublishedReason("---\n公開: false # 書きかけ\n---\n本文"), "公開: false");
-  assert.equal(getUnpublishedReason("---\n種別: メタ # 内部資料\n---\n本文"), "種別: メタ");
-  assert.equal(getUnpublishedReason("> [!CAUTION]- 未査読\n本文"), "未査読");
-  assert.equal(getUnpublishedReason('---\ntitle: "C# 入門"\n---\n本文'), null);
-});
-
-test("getUnpublishedReason handles quoted values with trailing comments and draft notes", () => {
-  assert.equal(getUnpublishedReason('---\n種別: "メタ" # 内部資料\n---\n本文'), "種別: メタ");
-  assert.equal(getUnpublishedReason('---\n公開: "false" # 書きかけ\n---\n本文'), "公開: false");
-  assert.equal(getUnpublishedReason("---\ndraft: true\n---\n本文"), "draft: true");
-  assert.equal(getUnpublishedReason("---\n公開: true\n---\n本文"), null);
-});
-
 test("parseFrontmatter keeps # inside quoted values", () => {
   const { data } = parseFrontmatter('---\ntitle: "C# 入門" # コメント\n---\n本文');
   assert.equal(data.title, "C# 入門");
-});
-
-test("getUnpublishedReason is fail-closed for frontmatter it cannot read simply", () => {
-  const unsupported = [
-    '---\n"公開": false\n---\n本文', // 引用符付きキー
-    "---\n  種別 : 'メタ'\n---\n本文", // 字下げされたキー
-    "---\n種別: |-\n  メタ\n---\n本文", // ブロック形式
-    "---\n種別: |2-\n  メタ\n---\n本文",
-    "---\n公開:\n# 非公開の指定\n  false\n---\n本文", // コメント行
-    "---\nsummary: |\n  メモ\n  ---\n  続き\n公開: false\n---\n本文", // ブロック値内の ---
-    '{"公開": false, "title": "内部資料"}\n本文', // JSON 形式
-    "---\n公開:\n  - false\n---\n本文", // 判定キーがリスト
-    "---\n種別: 国\n本文 (閉じていない frontmatter)",
-    "---\n公開: false\n公開: true\n---\n本文", // 重複キー
-    "---\ndraft: true\nDraft: false\n---\n本文",
-    '---\n種別: "\\u30e1\\u30bf"\n---\n本文', // エスケープ入りの値
-  ];
-  for (const source of unsupported) {
-    assert.equal(getUnpublishedReason(source), UNSUPPORTED_FRONTMATTER, source);
-  }
-});
-
-test("getUnpublishedReason reads simple frontmatter and stays publishable otherwise", () => {
-  assert.equal(getUnpublishedReason('--- \n公開: " false "\n--- \n本文'), "公開: false");
-  assert.equal(getUnpublishedReason("---\nDraft: TRUE\n---\n本文"), "draft: true");
-  assert.equal(getUnpublishedReason("---\n種別: メタデータ論\n公開: falsey\n---\n本文"), null);
-  assert.equal(getUnpublishedReason("---\n種別: 国\ntags:\n  - 地理\n---\n本文\n公開: false"), null);
-  assert.equal(getUnpublishedReason("本文中に 公開: false と書いただけ"), null);
-  assert.equal(getUnpublishedReason("{{架空|デーレ界}}\n{{基礎情報 国\n|訳国名=テスト\n}}\n本文"), null);
 });
 
 test("parseFrontmatter keeps escaped quotes and # inside quoted values", () => {
@@ -656,3 +601,38 @@ test("parseFrontmatter keeps escaped quotes and # inside quoted values", () => {
   assert.equal(data.sub, "It's # ok");
 });
 
+
+test("checkPublication publishes only notes that opt in with 公開: true", () => {
+  const published = (source) => checkPublication(source).published;
+
+  assert.equal(published("---\n種別: 国\n公開: true\n---\n本文"), true);
+  assert.equal(published('---\r\n公開: "true" # 査読済み\r\n---\r\n本文'), true);
+  assert.equal(published("\uFEFF---\n公開: TRUE\n---\n本文"), true);
+  assert.equal(published("---\n種別: 国\n---\n本文"), false);
+  assert.equal(published("---\n公開: false\n---\n本文"), false);
+  assert.equal(published("frontmatter なしの本文\n公開: true"), false);
+  assert.equal(published("---\n公開: truely\n---\n本文"), false);
+});
+
+test("checkPublication does not publish frontmatter it cannot read simply", () => {
+  const unreadable = [
+    '---\n"公開": true\n---\n本文', // 引用符付きキー
+    "---\n公開: |-\n  true\n---\n本文", // ブロック形式
+    "---\n公開: false\n公開: true\n---\n本文", // 重複キー
+    '{"公開": true}\n本文', // JSON 形式
+    "---\n公開: true\n本文 (閉じていない frontmatter)",
+  ];
+  for (const source of unreadable) {
+    assert.deepEqual(checkPublication(source), { published: false, unreadable: true }, source);
+  }
+
+  // 読めるが true ではないもの
+  const notTrue = [
+    "---\n公開:\n  - true\n---\n本文", // リスト
+    `---\n公開: "${"\\"}u0074rue"\n---\n本文`, // エスケープ (\u0074rue) は解釈しない
+    "{{架空|デーレ界}}\n本文", // frontmatter なし
+  ];
+  for (const source of notTrue) {
+    assert.deepEqual(checkPublication(source), { published: false, unreadable: false }, source);
+  }
+});

@@ -1117,19 +1117,11 @@ function buildTemplateModels(templates, templateHandlers) {
     .filter(Boolean);
 }
 
-const UNREVIEWED_CALLOUT = /^\s*>\s*\[!caution\][-+]?\s*未査読/im;
-
-// 非公開の判定は「迷ったら非公開」(fail-closed)。frontmatter は単純な形
-// (空行 / `キー: 値` / 前のキーに続く `- 項目`) だけを解釈し、それ以外の書き方
-// (JSON 形式、ブロック形式、コメント行、引用符付きキー、閉じていない frontmatter など) は
-// 中身を推測せずに非公開とする。誤って非公開になるのは許容し、誤って公開されることだけを防ぐ。
-export const UNSUPPORTED_FRONTMATTER = "frontmatter を解釈できない形式";
-
-const UNPUBLISHED_FLAGS = [
-  { key: "種別", value: "メタ", reason: "種別: メタ" },
-  { key: "公開", value: "false", reason: "公開: false" },
-  { key: "draft", value: "true", reason: "draft: true" },
-];
+// 公開するのは frontmatter に `公開: true` がある原稿だけ (オプトイン)。
+// frontmatter は単純な形 (空行 / `キー: 値` / 前のキーに続く `- 項目`) だけを解釈し、
+// それ以外の書き方 (JSON 形式、ブロック形式、コメント行、引用符付きキー、重複キー、
+// 閉じていない frontmatter など) は中身を推測せずに「解釈できない」= 公開しない、とする。
+const PUBLISH_KEY = "公開";
 
 const SIMPLE_KEY_LINE = /^([\p{L}\p{N}_-]+):(?:\s+(.*))?$/u;
 const LIST_ITEM_LINE = /^\s*-\s+\S/;
@@ -1143,7 +1135,7 @@ function normalizeFlagValue(rawValue) {
 function readSimpleFrontmatter(source) {
   const lines = source.split("\n");
   const firstLine = lines[0]?.trim() ?? "";
-  // JSON 形式の frontmatter ({"公開": false}) は解釈しない。{{テンプレート}} で始まる本文は対象外
+  // JSON 形式の frontmatter ({"公開": true}) は解釈しない。{{テンプレート}} で始まる本文は対象外
   if (/^\{(?!\{)/.test(firstLine)) {
     return null;
   }
@@ -1187,35 +1179,18 @@ function readSimpleFrontmatter(source) {
   return values;
 }
 
-// 公開しない原稿なら理由を、公開してよければ null を返す。
-// ここで弾いた原稿はビルドに含めず、git にもコミットさせない (.git/info/exclude と pre-commit フック)。
-export function getUnpublishedReason(sourceText) {
-  const source = normalizeNewlines(sourceText);
-
-  if (UNREVIEWED_CALLOUT.test(source)) {
-    return "未査読";
-  }
-
-  const frontmatter = readSimpleFrontmatter(source);
+// 原稿を公開するかどうか。unreadable は frontmatter を解釈できなかった (=公開しない) ことを表す
+export function checkPublication(sourceText) {
+  const frontmatter = readSimpleFrontmatter(normalizeNewlines(sourceText));
   if (!frontmatter) {
-    return UNSUPPORTED_FRONTMATTER;
+    return { published: false, unreadable: true };
   }
 
-  for (const { key, value, reason } of UNPUBLISHED_FLAGS) {
-    if (!(key.toLowerCase() in frontmatter)) {
-      continue;
-    }
-    // 判定に使うキーがリスト形式やエスケープ入り ("メ…") なら、中身を推測せずに非公開にする
-    const rawValue = frontmatter[key.toLowerCase()];
-    if (rawValue === null || rawValue.includes("\\")) {
-      return UNSUPPORTED_FRONTMATTER;
-    }
-    if (normalizeFlagValue(rawValue) === value) {
-      return reason;
-    }
-  }
-
-  return null;
+  const rawValue = frontmatter[PUBLISH_KEY];
+  return {
+    published: typeof rawValue === "string" && normalizeFlagValue(rawValue) === "true",
+    unreadable: false,
+  };
 }
 
 export function findDuplicateEntryIds(entries) {
