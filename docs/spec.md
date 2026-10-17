@@ -1,5 +1,8 @@
 # WikiLikePages 仕様 v0.3
 
+> **個人用フォークについて**: このリポジトリは [WikiLikePages](https://github.com/asteain-ninia/WikiLikePages) を一人で執筆・公開する前提でフォークしたものです。
+> 本書のうち複数参加者・投稿経路 (Pull Request レビュー、Issue Form、外部フォーム) に関する記述は、このフォークでは適用しません。原稿は `content/` に置いて `main` へ直接 push します。
+
 ## 1. 背景
 
 - 共同創作に使うWikiサービスの選定が難航している。
@@ -47,7 +50,7 @@
 - 静的サイト生成: 自前の Node.js ビルドスクリプト (`scripts/`)
 - 公開: GitHub Pages (GitHub Actions 経由でデプロイ)
 
-投稿経路の詳細は [contribution-workflows.md](./contribution-workflows.md) を参照。
+投稿経路の詳細は 上流リポジトリの `docs/contribution-workflows.md`（このフォークでは削除済み） を参照。
 実装の詳細は [implementation-architecture.md](./implementation-architecture.md) を参照。
 
 ### 6.2 Quartz 4 を採用しなかった経緯
@@ -199,7 +202,7 @@ summary: 1行要約
 ### 9.2 更新フロー
 
 投稿フローは複数レーンを持つが、公開変更はすべてPull Requestへ集約する。
-各レーンの詳細は [contribution-workflows.md](./contribution-workflows.md) を参照。
+各レーンの詳細は 上流リポジトリの `docs/contribution-workflows.md`（このフォークでは削除済み） を参照。
 
 ### 9.3 公開ルール
 
@@ -298,7 +301,7 @@ summary: 1行要約
 - 直接push可能なメンバーとPR必須メンバーを分けるか
 - 画像アップロード頻度はどれくらいか
 - ページ名に日本語を使う方針でURL体裁を許容できるか
-- 投稿経路の選択は [contribution-workflows.md](./contribution-workflows.md) の未決事項を参照
+- 投稿経路の選択は 上流リポジトリの `docs/contribution-workflows.md`（このフォークでは削除済み） の未決事項を参照
 
 ### 14.2 技術方針
 

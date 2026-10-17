@@ -10,7 +10,6 @@
   --color-featured: #cef2e0;
   --color-new: #cedff2;
   --color-updates: #fff1c6;
-  --color-guides: #f9eaea;
 }
 
 html {
@@ -299,10 +298,6 @@ html[data-file-protocol="true"] .protocol-warning {
   background: var(--color-updates);
 }
 
-.portal-box--guides h2 {
-  background: var(--color-guides);
-}
-
 .feature-article h3,
 .preview-article h3 {
   margin: 0 0 8px;
@@ -331,15 +326,13 @@ html[data-file-protocol="true"] .protocol-warning {
 }
 
 .entry-list,
-.plain-list,
-.process-list {
+.plain-list {
   margin: 0;
   padding-left: 1.3rem;
 }
 
 .entry-list li,
-.plain-list li,
-.process-list li {
+.plain-list li {
   margin-bottom: 0.4rem;
 }
 
@@ -547,12 +540,6 @@ html[data-file-protocol="true"] .protocol-warning {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.history-author {
-  color: var(--color-text-muted);
-  font-size: 0.8rem;
   white-space: nowrap;
 }
 

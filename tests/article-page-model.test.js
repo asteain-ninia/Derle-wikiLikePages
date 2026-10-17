@@ -66,15 +66,6 @@ const fixtureEntries = [
   },
 ];
 
-const fixtureSiteConfig = {
-  participationGuides: [
-    {
-      label: "標準投稿",
-      description: "Pull Request で提出する",
-    },
-  ],
-};
-
 test("extractWikiLinks parses simple, display-text and heading links", () => {
   assert.deepEqual(extractWikiLinks("[[白磁海]] [[潮見港|港]] [[白磁海#航路]]"), [
     {
@@ -230,7 +221,7 @@ test("buildArticlePageModel includes backlinks and unresolved link counts", () =
 
 test("buildMissingPageModel returns source pages and suggestions", () => {
   const graph = buildWikiGraph(fixtureEntries);
-  const missingPageModel = buildMissingPageModel(graph, fixtureSiteConfig, "白磁航路台帳");
+  const missingPageModel = buildMissingPageModel(graph, "白磁航路台帳");
 
   assert.deepEqual(
     missingPageModel.sourceEntries.map((entry) => entry.id),

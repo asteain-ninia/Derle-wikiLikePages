@@ -6,7 +6,7 @@
   <title>WikiLikePages</title>
   <meta
     name="description"
-    content="WikiLikePages — 共同創作のための百科事典。架空世界の国家・人物・歴史を記録し、つなげるWikiサイトです。"
+    content="WikiLikePages — 架空世界の国家・人物・歴史を記録し、つなげる個人用の百科事典です。"
   >
   <link rel="stylesheet" href="src/styles.css">
   <script>
@@ -23,7 +23,7 @@
         <span class="brand__mark" aria-hidden="true">W</span>
         <span class="brand__copy">
           <strong>WikiLikePages</strong>
-          <span>共同創作の百科事典</span>
+          <span>架空世界の百科事典</span>
         </span>
       </a>
 
@@ -32,7 +32,6 @@
           <a href="#overview">メインページ</a>
           <a href="#featured">選り抜き記事</a>
           <a href="#categories">カテゴリ</a>
-          <a href="#participation">参加案内</a>
         </nav>
 
         <form class="search-form" id="search-form" role="search">
@@ -61,7 +60,7 @@
 
     <div class="page-title">
       <h1 id="page-heading">メインページ</h1>
-      <p id="page-lead">架空世界の知識を集め、つなげる共同創作の百科事典です。</p>
+      <p id="page-lead">架空世界の知識を集め、つなげる百科事典です。</p>
     </div>
 
     <section class="search-results" id="search-results" hidden aria-live="polite"></section>
@@ -78,8 +77,8 @@
         <aside class="welcome-box__aside" aria-labelledby="about-heading">
           <h2 id="about-heading">このWikiについて</h2>
           <ul class="plain-list" id="about-list">
-            <li>架空世界の設定を記録・共有するための百科事典サイトです。</li>
-            <li>誰でも記事を投稿・編集でき、内部リンクで知識がつながります。</li>
+            <li>架空世界の設定を記録するための個人用の百科事典サイトです。</li>
+            <li>記事どうしは内部リンクでつながり、未作成の項目も赤リンクで追跡できます。</li>
             <li>Markdown と MediaWiki 記法の両方に対応しています。</li>
           </ul>
         </aside>
@@ -99,22 +98,12 @@
         </section>
       </div>
 
-      <div class="main-grid">
-        <section class="portal-box portal-box--updates" id="updates">
-          <h2>最近の更新</h2>
-          <div class="portal-box__body">
-            <ul class="entry-list entry-list--stacked" id="recent-updates"></ul>
-          </div>
-        </section>
-
-        <section class="portal-box portal-box--guides" id="participation">
-          <h2>参加案内</h2>
-          <div class="portal-box__body">
-            <ul class="plain-list" id="participation-list"></ul>
-            <ol class="process-list" id="process-list"></ol>
-          </div>
-        </section>
-      </div>
+      <section class="portal-box portal-box--updates" id="updates">
+        <h2>最近の更新</h2>
+        <div class="portal-box__body">
+          <ul class="entry-list entry-list--stacked" id="recent-updates"></ul>
+        </div>
+      </section>
 
       <section class="portal-box portal-box--preview" id="article-preview">
         <h2>記事プレビュー</h2>

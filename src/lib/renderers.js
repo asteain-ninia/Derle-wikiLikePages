@@ -504,20 +504,6 @@ export function renderCategoryPage(categoryName, articles) {
   `;
 }
 
-export function renderParticipationGuides(guides) {
-  return guides
-    .map(
-      (guide) => `
-        <li><strong>${escapeHtml(guide.label)}:</strong> ${escapeHtml(guide.description)}</li>
-      `
-    )
-    .join("");
-}
-
-export function renderProcessSteps(steps) {
-  return steps.map((step) => `<li>${escapeHtml(step)}</li>`).join("");
-}
-
 function renderHistory(history) {
   if (!history || history.length === 0) {
     return '<p class="empty-note">履歴情報はありません。</p>';
@@ -531,7 +517,6 @@ function renderHistory(history) {
             `<li>
               <span class="history-date">${escapeHtml(formatDisplayDate(entry.date))}</span>
               <span class="history-message">${escapeHtml(entry.message)}</span>
-              <span class="history-author">${escapeHtml(entry.author)}</span>
             </li>`
         )
         .join("")}
@@ -634,7 +619,7 @@ export function renderMissingPage(pageModel) {
         <p class="article-page__eyebrow">未作成記事</p>
         <h2>${escapeHtml(pageModel.title)}</h2>
         <p class="article-page__summary">
-          この項目はまだ公開記事として作成されていません。参照元と近い既存ページを確認し、必要なら原稿化してください。
+          この項目はまだ記事として作成されていません。参照元と近い既存ページを確認し、必要なら原稿化してください。
         </p>
       </header>
 
@@ -646,15 +631,11 @@ export function renderMissingPage(pageModel) {
           </section>
 
           <section class="article-section">
-            <h3>投稿導線</h3>
-            <ul class="plain-list">
-              ${pageModel.participationGuides
-                .map((guide) => {
-                  return `<li><strong>${escapeHtml(guide.label)}:</strong> ${escapeHtml(guide.description)}</li>`;
-                })
-                .join("")}
-            </ul>
-            <p><a href="#participation">メインページの参加案内へ戻る</a></p>
+            <h3>記事を作成する</h3>
+            <p>
+              <code>content/</code> 配下に原稿ファイル（例: <code>${escapeHtml(pageModel.title)}.wiki</code>）を置き、
+              <code>npm run build:content</code> を実行するとこのページが記事になります。
+            </p>
           </section>
         </div>
 

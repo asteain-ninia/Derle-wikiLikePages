@@ -1,6 +1,8 @@
-# WikiLikePages
+# Derle-wikiLikePages
 
-GitHub Pages で公開しつつ、Wikiライクな執筆体験は外部エディタへ委譲する共同創作基盤です。
+GitHub Pages で公開しつつ、Wikiライクな執筆体験は外部エディタへ委譲する個人用の Wiki 基盤です。
+
+[WikiLikePages](https://github.com/asteain-ninia/WikiLikePages) を一人で執筆・公開する前提でフォークしたもので、投稿経路やレビューの仕組みは持ちません。原稿は `content/` に置き、`main` へ直接 push すると GitHub Pages へ自動デプロイされます。
 
 2026-03-17 に試作品を `archive/prototypes/` へ隔離し、ルート配下は正式実装の着手点へ切り替えました。
 
@@ -31,5 +33,4 @@ GitHub Pages で公開しつつ、Wikiライクな執筆体験は外部エディ
 ## ドキュメント
 
 - 仕様たたき台: [docs/spec.md](docs/spec.md)
-- 投稿経路: [docs/contribution-workflows.md](docs/contribution-workflows.md)
 - 実装アーキテクチャ: [docs/implementation-architecture.md](docs/implementation-architecture.md)

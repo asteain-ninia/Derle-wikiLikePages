@@ -63,8 +63,6 @@ const fixtureSiteConfig = {
     { name: "組織", description: "desc" },
     { name: "年表", description: "desc" },
   ],
-  participationGuides: [],
-  processSteps: [],
 };
 
 test("formatDisplayDate converts ISO-like dates for display", () => {

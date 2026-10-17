@@ -23,9 +23,7 @@ import {
   renderFeaturedArticle,
   renderMissingPage,
   renderNotFoundPage,
-  renderParticipationGuides,
   renderPreviewArticle,
-  renderProcessSteps,
   renderSearchResults,
   renderSummaryList,
   renderUpdateList,
@@ -43,8 +41,6 @@ const elements = {
   featuredArticle: document.getElementById("featured-article"),
   newArticles: document.getElementById("new-articles"),
   recentUpdates: document.getElementById("recent-updates"),
-  participationList: document.getElementById("participation-list"),
-  processList: document.getElementById("process-list"),
   categoryGrid: document.getElementById("category-grid"),
   previewArticle: document.getElementById("article-preview-card"),
   searchForm: document.getElementById("search-form"),
@@ -88,8 +84,6 @@ function renderStaticSections() {
 
   elements.newArticles.innerHTML = renderSummaryList(homePageModel.newArticles);
   elements.recentUpdates.innerHTML = renderUpdateList(homePageModel.recentUpdates);
-  elements.participationList.innerHTML = renderParticipationGuides(homePageModel.participationGuides);
-  elements.processList.innerHTML = renderProcessSteps(homePageModel.processSteps);
   elements.categoryGrid.innerHTML = renderCategoryCards(homePageModel.categoryCards);
 }
 
@@ -161,7 +155,7 @@ function updatePageHeader(route) {
   }
 
   elements.pageHeading.textContent = "メインページ";
-  elements.pageLead.textContent = "架空世界の知識を集め、つなげる共同創作の百科事典です。";
+  elements.pageLead.textContent = "架空世界の知識を集め、つなげる百科事典です。";
   document.title = "WikiLikePages";
 }
 
@@ -208,7 +202,7 @@ function renderDetailView(route) {
 
   if (route.view === "missing") {
     elements.detailView.innerHTML = renderMissingPage(
-      buildMissingPageModel(wikiGraph, siteConfig, route.title)
+      buildMissingPageModel(wikiGraph, route.title)
     );
     window.scrollTo({ top: 0, behavior: "smooth" });
     return;

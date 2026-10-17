@@ -81,8 +81,6 @@ export function buildHomePageModel({ articles, siteConfig }) {
     newArticles,
     recentUpdates,
     categoryCards,
-    participationGuides: siteConfig.participationGuides,
-    processSteps: siteConfig.processSteps,
     stats: {
       articleCount: articles.length,
       categoryCount: activeCategoryCount,

@@ -84,7 +84,7 @@ function getGitHistory(repoRelativePath) {
   try {
     const output = execFileSync(
       "git",
-      ["log", "--follow", "--format=%cs\t%an\t%s", "--", repoRelativePath],
+      ["log", "--follow", "--format=%cs\t%s", "--", repoRelativePath],
       {
         cwd: projectRoot,
         encoding: "utf8",
@@ -96,8 +96,8 @@ function getGitHistory(repoRelativePath) {
       .map((line) => line.trim())
       .filter(Boolean)
       .map((line) => {
-        const [date, author, ...messageParts] = line.split("\t");
-        return { date, author, message: messageParts.join("\t") };
+        const [date, ...messageParts] = line.split("\t");
+        return { date, message: messageParts.join("\t") };
       });
   } catch {
     return [];

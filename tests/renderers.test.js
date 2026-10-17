@@ -120,12 +120,11 @@ test("renderMissingPage shows source entries and guidance", () => {
     title: "白磁航路台帳",
     sourceEntries: [{ id: "entry-1", title: "白磁海", category: "世界設定", updated: "2026-03-15" }],
     suggestions: [{ id: "entry-2", title: "潮見港", category: "世界設定", updated: "2026-03-14" }],
-    participationGuides: [{ label: "標準投稿", description: "PRで提出" }],
   });
 
   assert.match(rendered, /参照元ページ/);
   assert.match(rendered, /近い既存ページ/);
-  assert.match(rendered, /標準投稿/);
+  assert.match(rendered, /白磁航路台帳.wiki/);
 });
 
 test("renderDisambiguationPage lists candidate pages", () => {
@@ -807,8 +806,8 @@ test("renderArticlePage renders page history in sidebar", () => {
     backlinks: [],
     footnotes: [],
     history: [
-      { date: "2026-03-23", author: "太郎", message: "内容を更新" },
-      { date: "2026-03-20", author: "花子", message: "初版作成" },
+      { date: "2026-03-23", message: "内容を更新" },
+      { date: "2026-03-20", message: "初版作成" },
     ],
     sections: [
       { heading: "概要", anchorId: "section-概要", paragraphs: [[{ type: "text", value: "本文" }]] },
@@ -820,7 +819,7 @@ test("renderArticlePage renders page history in sidebar", () => {
   assert.match(rendered, /history-list/);
   assert.match(rendered, /内容を更新/);
   assert.match(rendered, /初版作成/);
-  assert.match(rendered, /太郎/);
+  assert.doesNotMatch(rendered, /history-author/);
 });
 
 test("renderArticlePage shows empty history message when no history", () => {

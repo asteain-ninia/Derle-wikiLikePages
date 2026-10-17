@@ -1,5 +1,5 @@
 export const siteConfig = {
-  preferredFeaturedId: "samples/デーレ共和国",
+  preferredFeaturedId: "",
   newArticleLimit: 4,
   recentUpdateLimit: 4,
   categoryDefinitions: [
@@ -23,25 +23,5 @@ export const siteConfig = {
       name: "年表",
       description: "事件や変遷を時系列で整理し、関連ページへ接続する入口です。",
     },
-  ],
-  participationGuides: [
-    {
-      label: "標準投稿",
-      description: "Obsidian 等のエディタで記事を執筆し、Pull Request で提出します。",
-    },
-    {
-      label: "簡易投稿",
-      description: "GitHub Issue Form から原稿を送ると、管理者がレビュー後に反映します。",
-    },
-    {
-      label: "その他の方法",
-      description: "GitHub アカウントがない場合も、フォーム経由で投稿できます。",
-    },
-  ],
-  processSteps: [
-    "記事原稿を Markdown または MediaWiki 記法で作成する",
-    "Pull Request または投稿フォームから提出する",
-    "レビューで内部リンクや書式を確認する",
-    "承認後、サイトに自動反映される",
   ],
 };

@@ -613,16 +613,11 @@ export function buildArticlePageModel(graph, entryId) {
   };
 }
 
-export function buildMissingPageModel(graph, siteConfig, title) {
-  const missingPage = graph.missingPagesByTitle[title] ?? {
+export function buildMissingPageModel(graph, title) {
+  return graph.missingPagesByTitle[title] ?? {
     title,
     sourceEntries: [],
     suggestions: findSuggestedEntries(graph.entries, title),
-  };
-
-  return {
-    ...missingPage,
-    participationGuides: siteConfig.participationGuides,
   };
 }
 
