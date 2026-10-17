@@ -843,3 +843,35 @@ test("renderArticlePage shows empty history message when no history", () => {
 
   assert.match(rendered, /履歴情報はありません/);
 });
+
+test("renderInlineMarkdown leaves underscores in generated link attributes untouched", () => {
+  const html = '<a class="wiki-link wiki-link--missing" href="#!missing/foo_bar_baz">foo_bar_baz</a>';
+  assert.equal(renderInlineMarkdown(html), html);
+});
+
+test("renderInlineMarkdown keeps underscores and asterisks inside external URLs", () => {
+  const rendered = renderInlineMarkdown("[資料](https://example.com/a_b_c/*x*y)");
+  assert.match(rendered, /href="https:\/\/example\.com\/a_b_c\/\*x\*y"/);
+  assert.doesNotMatch(rendered, /<em>/);
+});
+
+test("renderInlineMarkdown does not apply emphasis inside inline code", () => {
+  assert.equal(
+    renderInlineMarkdown("`snake_case_name` と `*ptr*`"),
+    '<code class="inline-code">snake_case_name</code> と <code class="inline-code">*ptr*</code>'
+  );
+});
+
+test("renderInlineMarkdown treats intraword underscores as literal but keeps _emphasis_", () => {
+  assert.equal(renderInlineMarkdown("foo_bar_baz"), "foo_bar_baz");
+  assert.equal(renderInlineMarkdown("前 _斜体_ 後"), "前 <em>斜体</em> 後");
+  assert.equal(renderInlineMarkdown("前 __太字__ 後"), "前 <strong>太字</strong> 後");
+});
+
+test("renderInlineMarkdown still formats emphasis inside external link labels", () => {
+  const rendered = renderInlineMarkdown("[**公式**サイト](https://example.com)");
+  assert.equal(
+    rendered,
+    '<a href="https://example.com" class="external-link" rel="noopener noreferrer"><strong>公式</strong>サイト</a>'
+  );
+});

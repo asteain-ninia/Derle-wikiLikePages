@@ -563,3 +563,15 @@ test("findDuplicateEntryIds reports files whose ids collide after dropping the e
     { id: "qafik", sourcePaths: ["qafik.md", "qafik.wiki"] },
   ]);
 });
+
+test("buildArticleRecord summary keeps intraword underscores and drops link syntax", () => {
+  const record = buildArticleRecord({
+    relativePath: "summary.md",
+    fileBasename: "summary",
+    sourceText: "snake_case_name と [資料](https://example.com/a_b) と _強調_",
+    created: "2026-01-01",
+    updated: "2026-01-01",
+  });
+
+  assert.equal(record.summary, "snake_case_name と 資料 と 強調");
+});

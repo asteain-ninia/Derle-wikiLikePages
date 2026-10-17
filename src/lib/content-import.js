@@ -47,13 +47,15 @@ function sanitizeInlineHtml(text) {
 }
 
 function stripInlineFormatting(text) {
+  // 描画側 (renderInlineMarkdown) と同じく、単語内の _ は強調として扱わない
   return text
+    .replace(/\[([^\]]+?)\]\(https?:\/\/[^)\s]+\)/g, "$1")
     .replace(/'''([^']+?)'''/g, "$1")
     .replace(/''([^']+?)''/g, "$1")
     .replace(/\*\*([^*]+?)\*\*/g, "$1")
-    .replace(/__([^_]+?)__/g, "$1")
+    .replace(/(^|[^\p{L}\p{N}_])__([^_]+?)__(?![\p{L}\p{N}_])/gu, "$1$2")
     .replace(/\*([^*\n]+?)\*/g, "$1")
-    .replace(/_([^_\n]+?)_/g, "$1")
+    .replace(/(^|[^\p{L}\p{N}_])_([^_\n]+?)_(?![\p{L}\p{N}_])/gu, "$1$2")
     .replace(/`([^`\n]+?)`/g, "$1");
 }
 

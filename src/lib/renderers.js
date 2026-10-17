@@ -30,24 +30,46 @@ function renderEntryLink(entry, options = {}) {
   return `<a${className} href="${escapeHtml(href)}">${escapeHtml(label)}</a>`;
 }
 
+const PLACEHOLDER_PATTERN = /(\d+)/g;
+
+function restorePlaceholders(text, heldParts) {
+  let restored = text;
+  // 保護した断片の中に別の保護断片が入れ子になることがあるため、残らなくなるまで戻す
+  while (restored.includes("")) {
+    restored = restored.replace(PLACEHOLDER_PATTERN, (_match, index) => heldParts[Number(index)]);
+  }
+  return restored;
+}
+
 export function renderInlineMarkdown(escapedText) {
-  return escapedText
+  const heldParts = [];
+  const hold = (html) => {
+    heldParts.push(html);
+    return `${heldParts.length - 1}`;
+  };
+
+  // 入力はエスケープ済みなので、ここにある < はすべて生成済みのタグ (<a>, <img> など)。
+  // 属性値・コード・URL を書式変換の対象から外すため、先に退避してから強調記法を処理する。
+  const formatted = escapedText
+    .replace(/<[^>]*>/g, (tag) => hold(tag))
+    .replace(/`([^`\n]+?)`/g, (_match, code) => hold(`<code class="inline-code">${code}</code>`))
+    .replace(
+      /\[([^\]]+?)\]\((https?:\/\/[^)\s]+)\)/g,
+      (_match, label, url) =>
+        `${hold(`<a href="${url}" class="external-link" rel="noopener noreferrer">`)}${label}${hold("</a>")}`
+    )
+    .replace(/&lt;(https?:\/\/[^\s&]+?)&gt;/g, (_match, url) =>
+      hold(`<a href="${url}" class="external-link" rel="noopener noreferrer">${url}</a>`)
+    )
     .replace(/\*\*\*(.+?)\*\*\*/g, "<strong><em>$1</em></strong>")
     .replace(/&#39;&#39;&#39;(.+?)&#39;&#39;&#39;/g, "<strong>$1</strong>")
     .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/__(.+?)__/g, "<strong>$1</strong>")
+    .replace(/(^|[^\p{L}\p{N}_])__(.+?)__(?![\p{L}\p{N}_])/gu, "$1<strong>$2</strong>")
     .replace(/&#39;&#39;(.+?)&#39;&#39;/g, "<em>$1</em>")
     .replace(/\*([^*\n]+?)\*/g, "<em>$1</em>")
-    .replace(/_([^_\n]+?)_/g, "<em>$1</em>")
-    .replace(/`([^`\n]+?)`/g, '<code class="inline-code">$1</code>')
-    .replace(
-      /\[([^\]]+?)\]\((https?:\/\/[^)]+)\)/g,
-      '<a href="$2" class="external-link" rel="noopener noreferrer">$1</a>'
-    )
-    .replace(
-      /&lt;(https?:\/\/[^\s&]+?)&gt;/g,
-      '<a href="$1" class="external-link" rel="noopener noreferrer">$1</a>'
-    )
+    .replace(/(^|[^\p{L}\p{N}_])_([^_\n]+?)_(?![\p{L}\p{N}_])/gu, "$1<em>$2</em>");
+
+  return restorePlaceholders(formatted, heldParts)
     .replace(/&lt;(small|sup|sub)&gt;/gi, "<$1>")
     .replace(/&lt;\/(small|sup|sub)&gt;/gi, "</$1>")
     .replace(/&lt;br\s*\/?&gt;/gi, "<br>")
@@ -173,7 +195,7 @@ export function renderFootnotes(footnotes) {
   const items = footnotes
     .map((note, index) => {
       const body = note.segments
-        ? renderInlineMarkdown(renderParagraphSegments(note.segments))
+        ? renderParagraphSegments(note.segments)
         : renderInlineMarkdown(escapeHtml(note));
       return `<li id="fn-${index + 1}"><span class="footnote__number">[${index + 1}]</span> ${body}</li>`;
     })
