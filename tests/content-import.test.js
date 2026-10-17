@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   buildArticleRecord,
   extractLeadingTemplates,
+  findDuplicateEntryIds,
   parseFrontmatter,
   parseMarkdownSections,
 } from "../src/lib/content-import.js";
@@ -544,4 +545,21 @@ test("parseMarkdownSections parses <syntaxhighlight> blocks", () => {
   assert.ok(code, "code-block paragraph should exist");
   assert.equal(code.language, "javascript");
   assert.ok(code.body.includes("const x = 1"), "code body should contain content");
+});
+
+test("findDuplicateEntryIds reports files whose ids collide after dropping the extension", () => {
+  const build = (relativePath) =>
+    buildArticleRecord({
+      relativePath,
+      fileBasename: "qafik",
+      sourceText: "本文",
+      created: "2026-01-01",
+      updated: "2026-01-01",
+    });
+
+  const entries = [build("qafik.md"), build("qafik.wiki"), build("other/qafik.md")];
+
+  assert.deepEqual(findDuplicateEntryIds(entries), [
+    { id: "qafik", sourcePaths: ["qafik.md", "qafik.wiki"] },
+  ]);
 });

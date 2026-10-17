@@ -1098,6 +1098,19 @@ function buildTemplateModels(templates, templateHandlers) {
     .filter(Boolean);
 }
 
+export function findDuplicateEntryIds(entries) {
+  const sourcePathsById = new Map();
+  for (const entry of entries) {
+    const sourcePaths = sourcePathsById.get(entry.id) ?? [];
+    sourcePaths.push(entry.sourcePath);
+    sourcePathsById.set(entry.id, sourcePaths);
+  }
+
+  return [...sourcePathsById]
+    .filter(([, sourcePaths]) => sourcePaths.length > 1)
+    .map(([id, sourcePaths]) => ({ id, sourcePaths }));
+}
+
 export function buildArticleRecord({
   relativePath,
   fileBasename,

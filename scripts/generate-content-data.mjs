@@ -3,7 +3,7 @@ import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { buildArticleRecord } from "../src/lib/content-import.js";
+import { buildArticleRecord, findDuplicateEntryIds } from "../src/lib/content-import.js";
 import { loadTemplateHandlers } from "../src/lib/template-registry.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -151,6 +151,16 @@ async function buildContentData() {
     });
     record.history = history;
     entries.push(record);
+  }
+
+  const duplicates = findDuplicateEntryIds(entries);
+  if (duplicates.length > 0) {
+    const details = duplicates
+      .map(({ id, sourcePaths }) => `  ${id}: ${sourcePaths.join(", ")}`)
+      .join("\n");
+    throw new Error(
+      `拡張子だけが異なる原稿が同じ記事 ID になっています。どちらか一方を削除またはリネームしてください。\n${details}`
+    );
   }
 
   const nonDraftEntries = entries.filter((entry) => !entry.draft);
