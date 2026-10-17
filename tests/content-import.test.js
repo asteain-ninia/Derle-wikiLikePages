@@ -598,3 +598,12 @@ test("getUnpublishedReason detects unreviewed stubs, meta notes and opt-out note
   assert.equal(getUnpublishedReason("---\n種別: 国\n---\n本文で未査読という語に触れるだけ"), null);
   assert.equal(getUnpublishedReason("frontmatter なしの本文"), null);
 });
+
+test("getUnpublishedReason is not fooled by a BOM, trailing YAML comments or callout variants", () => {
+  assert.equal(getUnpublishedReason("\uFEFF---\n公開: false\n---\n書きかけ"), "公開: false");
+  assert.equal(getUnpublishedReason("\uFEFF> [!caution] 未査読\n本文"), "未査読");
+  assert.equal(getUnpublishedReason("---\n公開: false # 書きかけ\n---\n本文"), "公開: false");
+  assert.equal(getUnpublishedReason("---\n種別: メタ # 内部資料\n---\n本文"), "種別: メタ");
+  assert.equal(getUnpublishedReason("> [!CAUTION]- 未査読\n本文"), "未査読");
+  assert.equal(getUnpublishedReason('---\ntitle: "C# 入門"\n---\n本文'), null);
+});

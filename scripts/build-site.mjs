@@ -1,3 +1,4 @@
+import { statSync } from "node:fs";
 import { access, cp, mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
@@ -52,7 +53,7 @@ await cp(contentRoot, path.join(distRoot, "content"), {
     if (path.basename(sourcePath).startsWith(".")) {
       return false;
     }
-    return !path.extname(sourcePath) || IMAGE_FILE_EXTENSIONS.test(sourcePath);
+    return statSync(sourcePath).isDirectory() || IMAGE_FILE_EXTENSIONS.test(sourcePath);
   },
 });
 

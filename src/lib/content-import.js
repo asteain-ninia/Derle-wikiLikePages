@@ -1,5 +1,6 @@
 function normalizeNewlines(value) {
-  return String(value).replace(/\r\n?/g, "\n");
+  // 先頭の BOM も落とす (BOM 付きだと frontmatter や未査読コールアウトの判定を外すため)
+  return String(value).replace(/^﻿/, "").replace(/\r\n?/g, "\n");
 }
 
 function stripWrappingQuotes(value) {
@@ -14,7 +15,10 @@ function stripWrappingQuotes(value) {
 }
 
 function parseScalarValue(rawValue) {
-  const value = stripWrappingQuotes(rawValue.trim());
+  const trimmed = rawValue.trim();
+  // 引用符で囲まれていない値の行末コメント (公開: false # 書きかけ) を落とす
+  const withoutComment = /^["']/.test(trimmed) ? trimmed : trimmed.replace(/\s+#.*$/, "");
+  const value = stripWrappingQuotes(withoutComment);
   if (value === "true") {
     return true;
   }
@@ -555,6 +559,11 @@ function processFootnotes(text) {
   });
   const cleaned = processed.replace(/<references\s*\/>/gi, "");
   return { text: cleaned, footnotes };
+}
+
+// Obsidian と同じく ![[ファイル名]] はファイル名だけで書けるので、content/ からのパスに解決する
+function resolveEmbedPaths(text, resolveAssetPath) {
+  return text.replace(/!\[\[([^\]|]+)/g, (_match, fileName) => `![[${resolveAssetPath(fileName.trim())}`);
 }
 
 function convertMediaWikiImageToEmbed(text) {
@@ -1113,7 +1122,7 @@ function buildTemplateModels(templates, templateHandlers) {
     .filter(Boolean);
 }
 
-const UNREVIEWED_CALLOUT = /^> \[!caution\] 未査読/m;
+const UNREVIEWED_CALLOUT = /^\s*>\s*\[!caution\][-+]?\s*未査読/im;
 
 // 公開しない原稿なら理由を、公開してよければ null を返す。
 // ここで弾いた原稿はビルドに含めず、git にもコミットさせない (.git/info/exclude と pre-commit フック)。
@@ -1167,10 +1176,9 @@ export function buildArticleRecord({
     extractLeadingTemplates(magicStripped);
   const { text: bodyWithoutCategories, categoryTags } =
     extractCategoryTags(bodyWithoutLeadingTemplates);
-  // Obsidian と同じく ![[ファイル名]] はファイル名だけで書けるので、content/ からのパスに解決する
-  const bodyWithImages = convertMediaWikiImageToEmbed(bodyWithoutCategories).replace(
-    /!\[\[([^\]|]+)/g,
-    (_match, fileName) => `![[${resolveAssetPath(fileName.trim())}`
+  const bodyWithImages = resolveEmbedPaths(
+    convertMediaWikiImageToEmbed(bodyWithoutCategories),
+    resolveAssetPath
   );
   const { text: bodyWithFootnoteRefs, footnotes } = processFootnotes(bodyWithImages);
   const bodyWithMainConverted = bodyWithFootnoteRefs.replace(
@@ -1233,11 +1241,15 @@ export function buildArticleRecord({
     relatedTitles,
     sourcePath: relativePath.replace(/\\/g, "/"),
     templates: templates.map((template) => template.name),
-    templateModels: buildTemplateModels(templates, templateHandlers).map((model) =>
-      model.images
-        ? { ...model, images: model.images.map((image) => ({ ...image, src: resolveAssetPath(image.src) })) }
-        : model
-    ),
+    templateModels: buildTemplateModels(templates, templateHandlers).map((model) => ({
+      ...model,
+      ...(model.images && {
+        images: model.images.map((image) => ({ ...image, src: resolveAssetPath(image.src) })),
+      }),
+      ...(model.rows && {
+        rows: model.rows.map((row) => ({ ...row, value: resolveEmbedPaths(row.value, resolveAssetPath) })),
+      }),
+    })),
     footnotes,
     sections,
     isRedirect,

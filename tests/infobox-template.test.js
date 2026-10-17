@@ -78,3 +78,17 @@ test("buildArticleRecord keeps continuation lines of a template param and resolv
   assert.deepEqual(infobox.rows, [{ label: "建国年月日", value: "建国：100年\n共和制開始：200年" }]);
   assert.match(JSON.stringify(record.sections), /!\[\[画像\/地図\.png\]\]/);
 });
+
+test("buildArticleRecord resolves image embeds written inside ordinary infobox rows", () => {
+  const record = buildArticleRecord({
+    relativePath: "テスト.md",
+    fileBasename: "テスト",
+    created: "2026-01-01",
+    updated: "2026-01-01",
+    templateHandlers: createTemplateRegistry([{ matchTemplate, build }]),
+    resolveAssetPath: (fileName) => `画像/${fileName}`,
+    sourceText: "{{基礎情報 国\n|訳国名=テスト\n|国旗=![[flag.png]]\n}}\n本文\n",
+  });
+
+  assert.deepEqual(record.templateModels[0].rows, [{ label: "国旗", value: "![[画像/flag.png]]" }]);
+});
