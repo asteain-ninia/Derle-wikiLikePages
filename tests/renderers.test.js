@@ -913,3 +913,41 @@ test("renderArticlePage renders ordered and nested mixed lists", () => {
     /<ol class="plain-list"><li>手順一<ul class="plain-list"><li>補足<\/li><\/ul><\/li><li>手順二<\/li><\/ol><ul class="plain-list"><li>別の箇条書き<\/li><\/ul>/
   );
 });
+
+test("renderInlineMarkdown terminates on stray placeholder delimiter characters in text", () => {
+  assert.equal(renderInlineMarkdown("前後0"), "前後0");
+});
+
+test("renderArticlePage wraps skipped list levels in an item instead of nesting lists directly", () => {
+  const item = (markers, value) => ({
+    type: "list-item",
+    markers,
+    bodySegments: [{ type: "text", value }],
+  });
+  const rendered = renderArticlePage({
+    id: "t-skip",
+    title: "テスト",
+    category: "記事",
+    created: "2026-03-10",
+    updated: "2026-03-15",
+    summary: "テスト",
+    aliases: [],
+    tags: [],
+    unresolvedLinkCount: 0,
+    backlinks: [],
+    sections: [
+      {
+        heading: "概要",
+        anchorId: "section-overview",
+        paragraphs: [item("**", "子"), item("*", "親"), item("***", "孫"), item("*", "次")],
+      },
+    ],
+    templateModels: [],
+  });
+
+  const list = rendered.match(/<ul class="plain-list">.*<\/ul>/s)[0].replaceAll(' class="plain-list"', "");
+  assert.equal(
+    list,
+    "<ul><li><ul><li>子</li></ul></li><li>親<ul><li><ul><li>孫</li></ul></li></ul></li><li>次</li></ul>"
+  );
+});

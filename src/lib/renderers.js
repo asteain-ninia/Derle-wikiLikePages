@@ -31,12 +31,14 @@ function renderEntryLink(entry, options = {}) {
 }
 
 const PLACEHOLDER_PATTERN = /(\d+)/g;
+const PLACEHOLDER_DELIMITERS = /[]/g;
 
 function restorePlaceholders(text, heldParts) {
   let restored = text;
-  // 保護した断片の中に別の保護断片が入れ子になることがあるため、残らなくなるまで戻す
-  while (restored.includes("")) {
-    restored = restored.replace(PLACEHOLDER_PATTERN, (_match, index) => heldParts[Number(index)]);
+  // 保護した断片の中に別の保護断片が入れ子になることがあるため、残らなくなるまで戻す。
+  // 入力側の区切り文字は事前に除去済みなので、ここに残るのは自分で作ったものだけ。
+  while (restored.search(PLACEHOLDER_PATTERN) !== -1) {
+    restored = restored.replace(PLACEHOLDER_PATTERN, (_match, index) => heldParts[Number(index)] ?? "");
   }
   return restored;
 }
@@ -51,6 +53,7 @@ export function renderInlineMarkdown(escapedText) {
   // 入力はエスケープ済みなので、ここにある < はすべて生成済みのタグ (<a>, <img> など)。
   // 属性値・コード・URL を書式変換の対象から外すため、先に退避してから強調記法を処理する。
   const formatted = escapedText
+    .replace(PLACEHOLDER_DELIMITERS, "")
     .replace(/<[^>]*>/g, (tag) => hold(tag))
     .replace(/`([^`\n]+?)`/g, (_match, code) => hold(`<code class="inline-code">${code}</code>`))
     .replace(
@@ -141,6 +144,10 @@ function renderList(items) {
       const tag = tags[openTags.length];
       html += `<${tag} class="plain-list">`;
       openTags.push(tag);
+      // 階層を飛ばした入力 (* の直後の *** など) では、リスト直下にリストが来ないよう空の項目で包む
+      if (openTags.length < tags.length) {
+        html += "<li>";
+      }
     }
 
     const content = item.bodySegments
