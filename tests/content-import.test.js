@@ -6,6 +6,7 @@ import {
   extractLeadingTemplates,
   findDuplicateEntryIds,
   getUnpublishedReason,
+  UNSUPPORTED_FRONTMATTER,
   parseFrontmatter,
   parseMarkdownSections,
 } from "../src/lib/content-import.js";
@@ -620,10 +621,28 @@ test("parseFrontmatter keeps # inside quoted values", () => {
   assert.equal(data.title, "C# 入門");
 });
 
-test("getUnpublishedReason also catches quoted keys in the raw frontmatter", () => {
-  assert.equal(getUnpublishedReason('---\n"公開": false\n---\n本文'), "公開: false");
-  assert.equal(getUnpublishedReason("---\n'draft': true\n---\n本文"), "draft: true");
-  assert.equal(getUnpublishedReason("---\n  種別 : 'メタ'\n---\n本文"), "種別: メタ");
+test("getUnpublishedReason is fail-closed for frontmatter it cannot read simply", () => {
+  const unsupported = [
+    '---\n"公開": false\n---\n本文', // 引用符付きキー
+    "---\n  種別 : 'メタ'\n---\n本文", // 字下げされたキー
+    "---\n種別: |-\n  メタ\n---\n本文", // ブロック形式
+    "---\n種別: |2-\n  メタ\n---\n本文",
+    "---\n公開:\n# 非公開の指定\n  false\n---\n本文", // コメント行
+    "---\nsummary: |\n  メモ\n  ---\n  続き\n公開: false\n---\n本文", // ブロック値内の ---
+    '{"公開": false, "title": "内部資料"}\n本文', // JSON 形式
+    "---\n公開:\n  - false\n---\n本文", // 判定キーがリスト
+    "---\n種別: 国\n本文 (閉じていない frontmatter)",
+  ];
+  for (const source of unsupported) {
+    assert.equal(getUnpublishedReason(source), UNSUPPORTED_FRONTMATTER, source);
+  }
+});
+
+test("getUnpublishedReason reads simple frontmatter and stays publishable otherwise", () => {
+  assert.equal(getUnpublishedReason('--- \n公開: " false "\n--- \n本文'), "公開: false");
+  assert.equal(getUnpublishedReason("---\nDraft: TRUE\n---\n本文"), "draft: true");
+  assert.equal(getUnpublishedReason("---\n種別: メタデータ論\n公開: falsey\n---\n本文"), null);
+  assert.equal(getUnpublishedReason("---\n種別: 国\ntags:\n  - 地理\n---\n本文\n公開: false"), null);
   assert.equal(getUnpublishedReason("本文中に 公開: false と書いただけ"), null);
 });
 
@@ -633,12 +652,3 @@ test("parseFrontmatter keeps escaped quotes and # inside quoted values", () => {
   assert.equal(data.sub, "It's # ok");
 });
 
-test("getUnpublishedReason reads flags conservatively regardless of YAML style", () => {
-  assert.equal(getUnpublishedReason('---\n"公開": false\n--- \n本文'), "公開: false");
-  assert.equal(getUnpublishedReason('--- \n"公開": " false "\n---\n本文'), "公開: false");
-  assert.equal(getUnpublishedReason("---\n種別: |-\n  メタ\n---\n本文"), "種別: メタ");
-  assert.equal(getUnpublishedReason("---\n種別: >\n  メタ # 規約\n---\n本文"), "種別: メタ");
-  assert.equal(getUnpublishedReason("---\nDraft: TRUE\n---\n本文"), "draft: true");
-  assert.equal(getUnpublishedReason("---\n種別: メタデータ論\n公開: falsey\n---\n本文"), null);
-  assert.equal(getUnpublishedReason("---\n種別: 国\n---\n本文\n公開: false"), null);
-});

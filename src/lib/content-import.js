@@ -1119,55 +1119,65 @@ function buildTemplateModels(templates, templateHandlers) {
 
 const UNREVIEWED_CALLOUT = /^\s*>\s*\[!caution\][-+]?\s*未査読/im;
 
-// 非公開の判定は簡易 YAML パーサーを通さず、frontmatter の生テキストを保守的に読む。
-// キー・値の引用符、前後の空白、行末コメント、ブロック形式 (|- の次行に値) の有無に関係なく、
-// 該当しそうなら非公開とみなす (誤って非公開になるのは許容、誤って公開されるのは不可)。
+// 非公開の判定は「迷ったら非公開」(fail-closed)。frontmatter は単純な形
+// (空行 / `キー: 値` / 前のキーに続く `- 項目`) だけを解釈し、それ以外の書き方
+// (JSON 形式、ブロック形式、コメント行、引用符付きキー、閉じていない frontmatter など) は
+// 中身を推測せずに非公開とする。誤って非公開になるのは許容し、誤って公開されることだけを防ぐ。
+export const UNSUPPORTED_FRONTMATTER = "frontmatter を解釈できない形式";
+
 const UNPUBLISHED_FLAGS = [
   { key: "種別", value: "メタ", reason: "種別: メタ" },
   { key: "公開", value: "false", reason: "公開: false" },
   { key: "draft", value: "true", reason: "draft: true" },
 ];
 
-function extractRawFrontmatterLines(source) {
+const SIMPLE_KEY_LINE = /^([\p{L}\p{N}_-]+):(?:\s+(.*))?$/u;
+const LIST_ITEM_LINE = /^\s*-\s+\S/;
+const COMPLEX_SCALAR = /^[|>{[&*!]/;
+
+function normalizeFlagValue(rawValue) {
+  return rawValue.replace(/\s+#.*$/, "").replace(/["'\s]/g, "").toLowerCase();
+}
+
+// frontmatter を単純な形として読めれば { キー: 値 (リストなら null) } を、読めなければ null を返す
+function readSimpleFrontmatter(source) {
   const lines = source.split("\n");
-  if (lines[0]?.trim() !== "---") {
-    return [];
+  const firstLine = lines[0]?.trim() ?? "";
+  if (firstLine.startsWith("{")) {
+    return null;
+  }
+  if (firstLine !== "---") {
+    return {};
   }
 
   const closingIndex = lines.findIndex((line, index) => index > 0 && line.trim() === "---");
-  return closingIndex === -1 ? [] : lines.slice(1, closingIndex);
-}
+  if (closingIndex === -1) {
+    return null;
+  }
 
-function normalizeRawFlagValue(text) {
-  return text
-    .split("\n")
-    .map((line) => line.replace(/(^|\s)#.*$/, ""))
-    .join(" ")
-    .replace(/^\s*[|>][-+]?/, "")
-    .replace(/["'\s]/g, "")
-    .toLowerCase();
-}
-
-function readRawFlagValues(frontmatterLines, key) {
-  const keyPattern = new RegExp(`^\\s*["']?${key}["']?\\s*:(.*)$`, "i");
-  const values = [];
-
-  frontmatterLines.forEach((line, index) => {
-    const keyMatch = keyPattern.exec(line);
-    if (!keyMatch) {
-      return;
+  const values = {};
+  let lastKey = null;
+  for (const line of lines.slice(1, closingIndex)) {
+    if (!line.trim()) {
+      continue;
     }
 
-    // 値の続き (字下げされた後続行) もまとめて読む
-    const continuation = [];
-    for (const nextLine of frontmatterLines.slice(index + 1)) {
-      if (!/^\s+\S/.test(nextLine)) {
-        break;
+    if (LIST_ITEM_LINE.test(line)) {
+      if (!lastKey || values[lastKey] !== null) {
+        return null;
       }
-      continuation.push(nextLine);
+      continue;
     }
-    values.push(normalizeRawFlagValue([keyMatch[1], ...continuation].join("\n")));
-  });
+
+    const keyMatch = SIMPLE_KEY_LINE.exec(line);
+    if (!keyMatch || COMPLEX_SCALAR.test(keyMatch[2] ?? "")) {
+      return null;
+    }
+
+    lastKey = keyMatch[1].toLowerCase();
+    // 値が空のキーは、続く `- 項目` を持つリストとして扱う
+    values[lastKey] = keyMatch[2]?.trim() ? keyMatch[2] : null;
+  }
 
   return values;
 }
@@ -1181,12 +1191,23 @@ export function getUnpublishedReason(sourceText) {
     return "未査読";
   }
 
-  const frontmatterLines = extractRawFrontmatterLines(source);
-  const flag = UNPUBLISHED_FLAGS.find(({ key, value }) =>
-    readRawFlagValues(frontmatterLines, key).includes(value)
-  );
+  const frontmatter = readSimpleFrontmatter(source);
+  if (!frontmatter) {
+    return UNSUPPORTED_FRONTMATTER;
+  }
 
-  return flag ? flag.reason : null;
+  for (const { key, value, reason } of UNPUBLISHED_FLAGS) {
+    if (!(key.toLowerCase() in frontmatter)) {
+      continue;
+    }
+    // 判定に使うキーがリスト形式なら、中身を推測せずに非公開にする
+    const rawValue = frontmatter[key.toLowerCase()];
+    if (rawValue === null || normalizeFlagValue(rawValue) === value) {
+      return rawValue === null ? UNSUPPORTED_FRONTMATTER : reason;
+    }
+  }
+
+  return null;
 }
 
 export function findDuplicateEntryIds(entries) {

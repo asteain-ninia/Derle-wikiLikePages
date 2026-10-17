@@ -160,8 +160,13 @@ async function buildContentData() {
     const repoRelativePath = toPosixPath(path.relative(projectRoot, absolutePath));
     const fileBasename = path.basename(absolutePath, path.extname(absolutePath));
     const sourceText = await readFile(absolutePath, "utf8");
-    if (getUnpublishedReason(sourceText)) {
+    const unpublishedReason = getUnpublishedReason(sourceText);
+    if (unpublishedReason) {
       unpublishedPaths.push(repoRelativePath);
+      // 未査読スタブは数が多く想定どおりなので黙って除外し、それ以外は気づけるように名前を出す
+      if (unpublishedReason !== "未査読") {
+        console.log(`  非公開: ${relativeToContent} (${unpublishedReason})`);
+      }
       continue;
     }
 
