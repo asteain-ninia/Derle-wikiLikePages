@@ -17,9 +17,10 @@ GitHub Pages で公開しつつ、Wikiライクな執筆体験は外部エディ
 
 ## 実行メモ
 
-- トップページは ES Modules を使っているため、`file://` ではなく `npm run serve` で HTTP 経由起動します
-- 既定の起動先は `http://localhost:4173` です
-- `content/` の原稿を画面データへ反映するには `npm run build:content` を実行します
+- トップページは ES Modules を使っているため、`file://` ではなく `npm run dev` (`npm run serve` も同じ) で HTTP 経由起動します
+- 既定の起動先は `http://localhost:4173` です。待ち受けはこの PC のみ (`127.0.0.1`) で、`HOST` / `PORT` 環境変数で変えられます
+- 開発サーバーは `content/` と `src/lib/templates/` を監視しており、原稿を保存すると自動で `build:content` を実行してブラウザを再読み込みします
+- サーバーを使わずに原稿を画面データへ反映するには `npm run build:content` を実行します
 - Pages に載せる公開物は `npm run build:site` で `dist/` へ出力します
 - 自動テストは `npm test` で実行できます
 
