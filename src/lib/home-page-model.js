@@ -1,3 +1,5 @@
+import { collectTextsFromParagraph } from "./article-page-model.js";
+
 export function formatDisplayDate(value) {
   return value.replaceAll("-", ".");
 }
@@ -45,7 +47,7 @@ export function searchArticles(entries, query) {
       ...((entry.sections ?? []).flatMap((section) => [
         section.heading,
         section.sourceHeading,
-        ...(section.paragraphs ?? []),
+        ...(section.paragraphs ?? []).flatMap(collectTextsFromParagraph),
       ])),
     ]
       .join(" ")

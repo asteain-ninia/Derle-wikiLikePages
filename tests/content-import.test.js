@@ -72,8 +72,8 @@ test("parseMarkdownSections keeps headings, strips inline templates and flattens
     sections[2].paragraphs[0],
     "海図改訂は[[灰塔文庫]]にも残る。"
   );
-  assert.equal(sections[2].paragraphs[1], "・[[潮見港]]");
-  assert.equal(sections[2].paragraphs[2], "・[[白磁航路台帳]]");
+  assert.deepEqual(sections[2].paragraphs[1], { type: "list-item", markers: "*", body: "[[潮見港]]" });
+  assert.deepEqual(sections[2].paragraphs[2], { type: "list-item", markers: "*", body: "[[白磁航路台帳]]" });
 });
 
 test("buildArticleRecord normalizes markdown content into article data", () => {
@@ -298,8 +298,8 @@ test("parseMarkdownSections parses inline blockquotes mid-line", () => {
 test("parseMarkdownSections parses MediaWiki list items (* item)", () => {
   const sections = parseMarkdownSections("* 項目A\n* [[項目B]]");
 
-  assert.equal(sections[0].paragraphs[0], "・項目A");
-  assert.equal(sections[0].paragraphs[1], "・[[項目B]]");
+  assert.deepEqual(sections[0].paragraphs[0], { type: "list-item", markers: "*", body: "項目A" });
+  assert.deepEqual(sections[0].paragraphs[1], { type: "list-item", markers: "*", body: "[[項目B]]" });
 });
 
 test("buildArticleRecord extracts footnotes from <ref> tags", () => {
@@ -510,10 +510,16 @@ test("parseMarkdownSections parses nested lists (** and ##)", () => {
     sourceText: `本文。\n\n* 項目A\n** サブ項目A1\n** サブ項目A2\n* 項目B`,
   });
 
-  const section = article.sections[0];
-  const paragraphs = section.paragraphs.filter((p) => typeof p === "string");
-  const hasNested = paragraphs.some((p) => p.includes("　・サブ項目A1"));
-  assert.ok(hasNested, "nested list items should have indentation prefix");
+  const listItems = article.sections[0].paragraphs.filter((p) => p.type === "list-item");
+  assert.deepEqual(
+    listItems.map(({ markers, body }) => [markers, body]),
+    [
+      ["*", "項目A"],
+      ["**", "サブ項目A1"],
+      ["**", "サブ項目A2"],
+      ["*", "項目B"],
+    ]
+  );
 });
 
 test("parseMarkdownSections parses <poem> blocks", () => {

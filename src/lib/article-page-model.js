@@ -1,4 +1,4 @@
-function collectTextsFromParagraph(paragraph) {
+export function collectTextsFromParagraph(paragraph) {
   if (typeof paragraph === "string") {
     return [paragraph];
   }
@@ -543,6 +543,14 @@ export function buildArticlePageModel(graph, entryId) {
 
       if (typeof paragraph === "object" && paragraph.type === "blockquote") {
         const bodySegments = buildWikiTextSegments(paragraph.body, graph);
+        return { ...paragraph, bodySegments };
+      }
+
+      if (typeof paragraph === "object" && paragraph.type === "list-item") {
+        const bodySegments = buildWikiTextSegments(paragraph.body, graph);
+        unresolvedLinkCount += bodySegments.filter(
+          (segment) => segment.type === "link" && segment.status !== "resolved"
+        ).length;
         return { ...paragraph, bodySegments };
       }
 

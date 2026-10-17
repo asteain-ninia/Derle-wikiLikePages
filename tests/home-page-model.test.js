@@ -154,3 +154,26 @@ test("buildHomePageModel assembles the home page state", () => {
     latestUpdatedDate: "2026-03-15",
   });
 });
+
+test("searchArticles finds text inside list items and table cells", () => {
+  const entries = [
+    {
+      id: "blocks",
+      title: "ブロック",
+      category: "記事",
+      sections: [
+        {
+          heading: "概要",
+          paragraphs: [
+            { type: "list-item", markers: "#", body: "リスト内の語句" },
+            { type: "table", rows: [[{ text: "表内の語句" }]] },
+          ],
+        },
+      ],
+    },
+  ];
+
+  assert.equal(searchArticles(entries, "リスト内の語句").length, 1);
+  assert.equal(searchArticles(entries, "表内の語句").length, 1);
+  assert.equal(searchArticles(entries, "object").length, 0);
+});

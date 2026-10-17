@@ -849,15 +849,15 @@ function buildParagraphs(lines) {
       continue;
     }
 
+    // List items keep their MediaWiki-style marker string ("*", "#", "*#", ...):
+    // its length is the nesting depth and each character is that level's list type.
     // Nested/mixed lists: **, ##, *#, #* etc.
     const nestedBulletMatch = /^([*#]{2,})\s+(.+)$/.exec(trimmed);
     if (nestedBulletMatch) {
       flushParagraph();
-      const depth = nestedBulletMatch[1].length;
       const itemText = normalizeSectionText(nestedBulletMatch[2]);
       if (itemText) {
-        const indent = "　".repeat(depth - 1);
-        paragraphs.push(`${indent}・${itemText}`);
+        paragraphs.push({ type: "list-item", markers: nestedBulletMatch[1], body: itemText });
       }
       lineIndex += 1;
       continue;
@@ -872,7 +872,11 @@ function buildParagraphs(lines) {
       const itemText = bulletMatch ? bulletMatch[2] : orderedMatch?.[2] ?? "";
       const normalizedItem = normalizeSectionText(itemText);
       if (normalizedItem) {
-        paragraphs.push(`・${normalizedItem}`);
+        paragraphs.push({
+          type: "list-item",
+          markers: bulletMatch ? "*" : "#",
+          body: normalizedItem,
+        });
       }
       lineIndex += 1;
       continue;
@@ -1027,10 +1031,6 @@ function buildSummaryParagraphs(sections) {
   for (const section of sections) {
     for (const paragraph of section.paragraphs) {
       if (typeof paragraph !== "string") {
-        continue;
-      }
-
-      if (paragraph.startsWith("・")) {
         continue;
       }
 

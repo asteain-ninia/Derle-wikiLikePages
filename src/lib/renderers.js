@@ -112,14 +112,48 @@ function renderParagraphSegments(segments) {
   return renderInlineMarkdown(raw);
 }
 
-function isListItemSegments(segments) {
-  return segments.length > 0 && segments[0].type === "text" && segments[0].value.startsWith("・");
-}
+function renderList(items) {
+  // MediaWiki と同じく、各項目のマーカー列 ("*", "#", "#*" ...) と開いているリストの
+  // スタックを先頭から比べ、食い違う階層を閉じてから足りない階層を開く。
+  const openTags = [];
+  let html = "";
 
-function stripListMarker(segments) {
-  const first = segments[0];
-  const stripped = { ...first, value: first.value.slice(1) };
-  return [stripped, ...segments.slice(1)];
+  for (const item of items) {
+    const tags = [...item.markers].map((marker) => (marker === "#" ? "ol" : "ul"));
+    let commonDepth = 0;
+    while (
+      commonDepth < openTags.length &&
+      commonDepth < tags.length &&
+      openTags[commonDepth] === tags[commonDepth]
+    ) {
+      commonDepth += 1;
+    }
+
+    while (openTags.length > commonDepth) {
+      html += `</li></${openTags.pop()}>`;
+    }
+
+    if (openTags.length === tags.length) {
+      html += "</li>";
+    }
+
+    while (openTags.length < tags.length) {
+      const tag = tags[openTags.length];
+      html += `<${tag} class="plain-list">`;
+      openTags.push(tag);
+    }
+
+    const content = item.bodySegments
+      ? renderParagraphSegments(item.bodySegments)
+      : renderInlineMarkdown(escapeHtml(item.body));
+    html += `<li>${content}`;
+  }
+
+  while (openTags.length > 0) {
+    html += `</li></${openTags.pop()}>`;
+  }
+
+  return html;
 }
 
 function renderWikiTable(tableModel) {
@@ -238,11 +272,7 @@ function renderSectionParagraphs(paragraphs) {
       return;
     }
 
-    parts.push(
-      `<ul class="plain-list">${listBuffer
-        .map((segments) => `<li>${renderParagraphSegments(stripListMarker(segments))}</li>`)
-        .join("")}</ul>`
-    );
+    parts.push(renderList(listBuffer));
     listBuffer = [];
   }
 
@@ -298,7 +328,7 @@ function renderSectionParagraphs(paragraphs) {
       continue;
     }
 
-    if (Array.isArray(segments) && isListItemSegments(segments)) {
+    if (segments && typeof segments === "object" && !Array.isArray(segments) && segments.type === "list-item") {
       listBuffer.push(segments);
       continue;
     }

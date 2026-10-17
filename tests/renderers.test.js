@@ -282,8 +282,8 @@ test("renderArticlePage renders list items as ul/li", () => {
         heading: "概要",
         anchorId: "section-overview",
         paragraphs: [
-          [{ type: "text", value: "・項目A" }],
-          [{ type: "text", value: "・項目B" }],
+          { type: "list-item", markers: "*", bodySegments: [{ type: "text", value: "項目A" }] },
+          { type: "list-item", markers: "*", bodySegments: [{ type: "text", value: "項目B" }] },
           [{ type: "text", value: "通常段落" }],
         ],
       },
@@ -873,5 +873,43 @@ test("renderInlineMarkdown still formats emphasis inside external link labels", 
   assert.equal(
     rendered,
     '<a href="https://example.com" class="external-link" rel="noopener noreferrer"><strong>公式</strong>サイト</a>'
+  );
+});
+
+test("renderArticlePage renders ordered and nested mixed lists", () => {
+  const item = (markers, value) => ({
+    type: "list-item",
+    markers,
+    bodySegments: [{ type: "text", value }],
+  });
+  const rendered = renderArticlePage({
+    id: "t-list",
+    title: "テスト",
+    category: "記事",
+    created: "2026-03-10",
+    updated: "2026-03-15",
+    summary: "テスト",
+    aliases: [],
+    tags: [],
+    unresolvedLinkCount: 0,
+    backlinks: [],
+    sections: [
+      {
+        heading: "概要",
+        anchorId: "section-overview",
+        paragraphs: [
+          item("#", "手順一"),
+          item("#*", "補足"),
+          item("#", "手順二"),
+          item("*", "別の箇条書き"),
+        ],
+      },
+    ],
+    templateModels: [],
+  });
+
+  assert.match(
+    rendered,
+    /<ol class="plain-list"><li>手順一<ul class="plain-list"><li>補足<\/li><\/ul><\/li><li>手順二<\/li><\/ol><ul class="plain-list"><li>別の箇条書き<\/li><\/ul>/
   );
 });
