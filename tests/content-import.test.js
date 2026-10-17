@@ -607,3 +607,15 @@ test("getUnpublishedReason is not fooled by a BOM, trailing YAML comments or cal
   assert.equal(getUnpublishedReason("> [!CAUTION]- 未査読\n本文"), "未査読");
   assert.equal(getUnpublishedReason('---\ntitle: "C# 入門"\n---\n本文'), null);
 });
+
+test("getUnpublishedReason handles quoted values with trailing comments and draft notes", () => {
+  assert.equal(getUnpublishedReason('---\n種別: "メタ" # 内部資料\n---\n本文'), "種別: メタ");
+  assert.equal(getUnpublishedReason('---\n公開: "false" # 書きかけ\n---\n本文'), "公開: false");
+  assert.equal(getUnpublishedReason("---\ndraft: true\n---\n本文"), "draft: true");
+  assert.equal(getUnpublishedReason("---\n公開: true\n---\n本文"), null);
+});
+
+test("parseFrontmatter keeps # inside quoted values", () => {
+  const { data } = parseFrontmatter('---\ntitle: "C# 入門" # コメント\n---\n本文');
+  assert.equal(data.title, "C# 入門");
+});

@@ -3,22 +3,12 @@ function normalizeNewlines(value) {
   return String(value).replace(/^﻿/, "").replace(/\r\n?/g, "\n");
 }
 
-function stripWrappingQuotes(value) {
-  if (
-    (value.startsWith('"') && value.endsWith('"')) ||
-    (value.startsWith("'") && value.endsWith("'"))
-  ) {
-    return value.slice(1, -1);
-  }
-
-  return value;
-}
-
 function parseScalarValue(rawValue) {
   const trimmed = rawValue.trim();
-  // 引用符で囲まれていない値の行末コメント (公開: false # 書きかけ) を落とす
-  const withoutComment = /^["']/.test(trimmed) ? trimmed : trimmed.replace(/\s+#.*$/, "");
-  const value = stripWrappingQuotes(withoutComment);
+  // 行末コメント (公開: false # 書きかけ / 種別: "メタ" # 内部資料) を落とす。
+  // 引用符で囲まれた値は、閉じ引用符より後ろだけをコメントとみなす
+  const quotedMatch = /^(["'])(.*?)\1(?:\s+#.*)?$/.exec(trimmed);
+  const value = quotedMatch ? quotedMatch[2] : trimmed.replace(/\s+#.*$/, "");
   if (value === "true") {
     return true;
   }
@@ -1134,12 +1124,19 @@ export function getUnpublishedReason(sourceText) {
     return "未査読";
   }
 
-  if (data["種別"] === "メタ") {
+  // 引用符付き ("false") でも同じ意味として扱う
+  const isFlag = (value, expected) => String(value ?? "").trim().toLowerCase() === expected;
+
+  if (String(data["種別"] ?? "").trim() === "メタ") {
     return "種別: メタ";
   }
 
-  if (data["公開"] === false) {
+  if (isFlag(data["公開"], "false")) {
     return "公開: false";
+  }
+
+  if (isFlag(data.draft, "true")) {
+    return "draft: true";
   }
 
   return null;
