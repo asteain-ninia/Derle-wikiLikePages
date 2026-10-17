@@ -144,6 +144,17 @@ async function buildContentData() {
     .filter((filePath) => !CONTENT_FILE_EXTENSIONS.test(filePath) && !IMAGE_FILE_EXTENSIONS.test(filePath))
     .map((filePath) => toPosixPath(path.relative(projectRoot, filePath)));
 
+  // 画像のファイル名 → content/ からのパス (同名の画像が複数あれば先に見つかった方)
+  const assetPathsByName = new Map();
+  for (const filePath of allFiles.filter((candidate) => IMAGE_FILE_EXTENSIONS.test(candidate))) {
+    const fileName = path.basename(filePath);
+    if (!assetPathsByName.has(fileName)) {
+      assetPathsByName.set(fileName, toPosixPath(path.relative(contentRoot, filePath)));
+    }
+  }
+  const resolveAssetPath = (fileName) =>
+    fileName.includes("/") ? fileName : assetPathsByName.get(fileName) ?? fileName;
+
   for (const absolutePath of markdownFiles) {
     const relativeToContent = toPosixPath(path.relative(contentRoot, absolutePath));
     const repoRelativePath = toPosixPath(path.relative(projectRoot, absolutePath));
@@ -164,6 +175,7 @@ async function buildContentData() {
       created: dates.created,
       updated: dates.updated,
       templateHandlers,
+      resolveAssetPath,
     });
     record.history = history;
     entries.push(record);

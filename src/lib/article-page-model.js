@@ -461,7 +461,7 @@ export function buildWikiTextSegments(text, graph) {
       segments.push({
         type: "embed",
         src: link.pageTitle,
-        alt: link.displayText || link.pageTitle,
+        alt: link.displayText || link.pageTitle.split("/").pop(),
       });
       cursor = link.end;
       continue;

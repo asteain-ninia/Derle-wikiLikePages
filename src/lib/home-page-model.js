@@ -63,10 +63,19 @@ export function buildCategoryCards(entries, categoryDefinitions) {
     return accumulator;
   }, {});
 
-  return categoryDefinitions.map((category) => ({
-    ...category,
-    articleCount: articleCountByCategory[category.name] ?? 0,
-  }));
+  // 定義済みのカテゴリを定義順に並べ、定義に無いカテゴリは後ろに足す。記事が無いカテゴリは出さない
+  const definedNames = new Set(categoryDefinitions.map((category) => category.name));
+  const undefinedCategories = Object.keys(articleCountByCategory)
+    .filter((name) => !definedNames.has(name))
+    .sort((left, right) => left.localeCompare(right, "ja-JP"))
+    .map((name) => ({ name, description: "" }));
+
+  return [...categoryDefinitions, ...undefinedCategories]
+    .map((category) => ({
+      ...category,
+      articleCount: articleCountByCategory[category.name] ?? 0,
+    }))
+    .filter((category) => category.articleCount > 0);
 }
 
 export function buildHomePageModel({ articles, siteConfig }) {

@@ -9,7 +9,8 @@ const projectRoot = path.resolve(__dirname, "..");
 const distRoot = path.join(projectRoot, "dist");
 
 const requiredEntries = ["index.html", "src"];
-const optionalEntries = ["content/assets", "CNAME", "favicon.ico", "robots.txt"];
+const optionalEntries = ["CNAME", "favicon.ico", "robots.txt"];
+const IMAGE_FILE_EXTENSIONS = /\.(png|jpe?g|gif|webp|svg)$/i;
 
 function pathExists(targetPath) {
   return access(targetPath).then(
@@ -38,6 +39,22 @@ for (const entry of optionalEntries) {
     await cp(sourcePath, path.join(distRoot, entry), { recursive: true });
   }
 }
+
+// 記事から参照する画像は content/ のどこに置いてもよいので、画像だけを構成ごとコピーする
+// (原稿そのものはビルド済みデータに入っているので配信しない)
+const contentRoot = path.join(projectRoot, "content");
+await cp(contentRoot, path.join(distRoot, "content"), {
+  recursive: true,
+  filter: (sourcePath) => {
+    if (sourcePath === contentRoot) {
+      return true;
+    }
+    if (path.basename(sourcePath).startsWith(".")) {
+      return false;
+    }
+    return !path.extname(sourcePath) || IMAGE_FILE_EXTENSIONS.test(sourcePath);
+  },
+});
 
 await writeFile(path.join(distRoot, ".nojekyll"), "", "utf8");
 

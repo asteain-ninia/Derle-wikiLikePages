@@ -20,6 +20,11 @@ export function escapeHtml(value) {
   });
 }
 
+// content/ からの相対パス (日本語・空白を含みうる) を img の src 用 URL にする
+function buildAssetUrl(contentRelativePath) {
+  return `content/${contentRelativePath.split("/").map(encodeURIComponent).join("/")}`;
+}
+
 function renderEntryLink(entry, options = {}) {
   const href = options.heading
     ? buildArticleHref(entry.id, options.heading)
@@ -98,7 +103,7 @@ function renderParagraphSegments(segments) {
       }
 
       if (segment.type === "embed") {
-        return `<img class="embed-image" src="content/${escapeHtml(segment.src)}" alt="${escapeHtml(segment.alt)}" loading="lazy">`;
+        return `<img class="embed-image" src="${escapeHtml(buildAssetUrl(segment.src))}" alt="${escapeHtml(segment.alt)}" loading="lazy">`;
       }
 
       const classNames = ["wiki-link"];
@@ -514,7 +519,7 @@ export function renderCategoryCards(categoryCards) {
         <a class="category-card" href="#!category/${encodeURIComponent(category.name)}">
           <h3>${escapeHtml(category.name)}</h3>
           <p class="category-card__count">記事数 ${category.articleCount}</p>
-          <p>${escapeHtml(category.description)}</p>
+          ${category.description ? `<p>${escapeHtml(category.description)}</p>` : ""}
         </a>
       `
     )
@@ -781,35 +786,31 @@ export function renderNotFoundPage(label) {
   `;
 }
 
-function renderInfoboxRowSegments(segments) {
-  return segments
-    .map((segment) => {
-      if (segment.type === "text") {
-        return renderInlineMarkdown(escapeHtml(segment.value));
-      }
-
-      const classNames = ["wiki-link"];
-      if (segment.status === "missing") {
-        classNames.push("wiki-link--missing");
-      } else if (segment.status === "ambiguous") {
-        classNames.push("wiki-link--ambiguous");
-      }
-
-      return `<a class="${classNames.join(" ")}" href="${escapeHtml(segment.href)}">${escapeHtml(segment.label)}</a>`;
-    })
-    .join("");
-}
-
 export function renderInfobox(model) {
   const headingHtml = model.heading
     ? `<caption class="infobox__heading">${escapeHtml(model.heading)}</caption>`
     : "";
 
+  const imagesHtml = (model.images ?? [])
+    .map(
+      (image) => `
+        <tr>
+          <td class="infobox__image" colspan="2">
+            <img src="${escapeHtml(buildAssetUrl(image.src))}" alt="${escapeHtml(image.caption || image.src)}" loading="lazy">
+            ${image.caption ? `<div class="infobox__caption">${escapeHtml(image.caption)}</div>` : ""}
+          </td>
+        </tr>
+      `
+    )
+    .join("");
+
   const rowsHtml = model.rows
     .map((row) => {
-      const valueHtml = row.segments
-        ? renderInfoboxRowSegments(row.segments)
-        : escapeHtml(row.value);
+      // 値の中の改行 (テンプレート内で折り返した行) は <br> にする
+      const valueHtml = (row.segments
+        ? renderParagraphSegments(row.segments)
+        : renderInlineMarkdown(escapeHtml(row.value))
+      ).replace(/\n/g, "<br>");
 
       return `
         <tr>
@@ -823,7 +824,7 @@ export function renderInfobox(model) {
   return `
     <table class="infobox" role="presentation">
       ${headingHtml}
-      <tbody>${rowsHtml}</tbody>
+      <tbody>${imagesHtml}${rowsHtml}</tbody>
     </table>
   `;
 }

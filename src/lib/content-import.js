@@ -200,17 +200,26 @@ function parseTemplateLineContent(content) {
     params: {},
   };
 
+  let lastKey = "";
   for (const line of lines.slice(1)) {
     const parameterMatch = /^\|\s*([^=]+?)\s*=\s*(.*)$/.exec(line.trim());
     if (parameterMatch) {
       const [, key, value] = parameterMatch;
-      template.params[key.trim()] = value.trim();
+      lastKey = key.trim();
+      template.params[lastKey] = value.trim();
       continue;
     }
 
     const positionalMatch = /^\|\s*(.+)$/.exec(line.trim());
     if (positionalMatch) {
+      lastKey = "";
       template.positional.push(positionalMatch[1].trim());
+      continue;
+    }
+
+    // | で始まらない行は直前のパラメータ値の続き (値の中で改行している)
+    if (lastKey && line.trim()) {
+      template.params[lastKey] = `${template.params[lastKey]}\n${line.trim()}`.trim();
     }
   }
 
@@ -293,24 +302,28 @@ export function extractLeadingTemplates(sourceText) {
   };
 }
 
-function inferTitle(frontmatter, introParagraphs, fileBasename) {
+// Obsidian と同じくファイル名を記事の正式なタイトルにする (frontmatter の title があればそちら)。
+function inferTitle(frontmatter, fileBasename) {
   if (typeof frontmatter.title === "string" && frontmatter.title.trim()) {
     return frontmatter.title.trim();
-  }
-
-  const leadingParagraph = introParagraphs[0] ?? "";
-  const boldTitleMatch = /^\*\*(.+?)\*\*/.exec(leadingParagraph)
-    ?? /^'''(.+?)'''/.exec(leadingParagraph);
-  if (boldTitleMatch) {
-    return normalizeInlineText(replaceWikiMarkupWithPlainText(boldTitleMatch[1]));
   }
 
   return fileBasename;
 }
 
+// 冒頭の太字 (**名称** / '''名称''') は記事の別名として扱う
+function inferLeadingBoldName(introParagraphs) {
+  const leadingParagraph = introParagraphs[0] ?? "";
+  const boldTitleMatch = /^\*\*(.+?)\*\*/.exec(leadingParagraph)
+    ?? /^'''(.+?)'''/.exec(leadingParagraph);
+  return boldTitleMatch ? normalizeInlineText(replaceWikiMarkupWithPlainText(boldTitleMatch[1])) : "";
+}
+
 function inferCategory(frontmatter, templates, title) {
-  if (typeof frontmatter.category === "string" && frontmatter.category.trim()) {
-    return frontmatter.category.trim();
+  for (const key of ["category", "種別"]) {
+    if (typeof frontmatter[key] === "string" && frontmatter[key].trim()) {
+      return frontmatter[key].trim();
+    }
   }
 
   if (templates.some((template) => template.name === "基礎情報 国")) {
@@ -1143,6 +1156,7 @@ export function buildArticleRecord({
   created,
   updated,
   templateHandlers,
+  resolveAssetPath = (fileName) => fileName,
 }) {
   const { data: frontmatter, body: sourceWithoutFrontmatter } = parseFrontmatter(sourceText);
   const { isRedirect, redirectTarget } = processRedirect(sourceWithoutFrontmatter);
@@ -1153,7 +1167,11 @@ export function buildArticleRecord({
     extractLeadingTemplates(magicStripped);
   const { text: bodyWithoutCategories, categoryTags } =
     extractCategoryTags(bodyWithoutLeadingTemplates);
-  const bodyWithImages = convertMediaWikiImageToEmbed(bodyWithoutCategories);
+  // Obsidian と同じく ![[ファイル名]] はファイル名だけで書けるので、content/ からのパスに解決する
+  const bodyWithImages = convertMediaWikiImageToEmbed(bodyWithoutCategories).replace(
+    /!\[\[([^\]|]+)/g,
+    (_match, fileName) => `![[${resolveAssetPath(fileName.trim())}`
+  );
   const { text: bodyWithFootnoteRefs, footnotes } = processFootnotes(bodyWithImages);
   const bodyWithMainConverted = bodyWithFootnoteRefs.replace(
     /\{\{main\|([^}]+)\}\}/gi,
@@ -1163,11 +1181,13 @@ export function buildArticleRecord({
   const restoredBody = restoreNowiki(cleanedBody, nowikiPlaceholders);
   const sections = parseMarkdownSections(restoredBody);
   const leadParagraphs = buildSummaryParagraphs(sections);
-  const title = isRedirect ? redirectTarget : inferTitle(frontmatter, leadParagraphs, fileBasename);
+  const title = isRedirect ? redirectTarget : inferTitle(frontmatter, fileBasename);
+  const leadingBoldName = inferLeadingBoldName(leadParagraphs);
   const aliases = buildUniqueList(
     [
       ...(Array.isArray(frontmatter.aliases) ? frontmatter.aliases : []),
       fileBasename !== title ? fileBasename : "",
+      leadingBoldName !== title ? leadingBoldName : "",
     ],
     12
   );
@@ -1213,7 +1233,11 @@ export function buildArticleRecord({
     relatedTitles,
     sourcePath: relativePath.replace(/\\/g, "/"),
     templates: templates.map((template) => template.name),
-    templateModels: buildTemplateModels(templates, templateHandlers),
+    templateModels: buildTemplateModels(templates, templateHandlers).map((model) =>
+      model.images
+        ? { ...model, images: model.images.map((image) => ({ ...image, src: resolveAssetPath(image.src) })) }
+        : model
+    ),
     footnotes,
     sections,
     isRedirect,

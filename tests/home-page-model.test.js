@@ -119,7 +119,7 @@ test("searchArticles also searches aliases, tags and section text", () => {
   );
 });
 
-test("buildCategoryCards counts articles by category definition", () => {
+test("buildCategoryCards counts articles in definition order and hides empty categories", () => {
   const cards = buildCategoryCards(fixtureArticles, fixtureSiteConfig.categoryDefinitions);
   assert.deepEqual(
     cards.map((card) => ({ name: card.name, articleCount: card.articleCount })),
@@ -127,7 +127,20 @@ test("buildCategoryCards counts articles by category definition", () => {
       { name: "世界設定", articleCount: 1 },
       { name: "人物", articleCount: 1 },
       { name: "組織", articleCount: 1 },
-      { name: "年表", articleCount: 0 },
+    ]
+  );
+});
+
+test("buildCategoryCards appends categories that have articles but no definition", () => {
+  const cards = buildCategoryCards(
+    [{ category: "神" }, { category: "国" }, { category: "国" }],
+    [{ name: "国", description: "" }]
+  );
+  assert.deepEqual(
+    cards.map((card) => [card.name, card.articleCount]),
+    [
+      ["国", 2],
+      ["神", 1],
     ]
   );
 });
