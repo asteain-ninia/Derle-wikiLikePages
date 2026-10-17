@@ -5,12 +5,19 @@ export const IMAGE_FILE = /\.(png|jpe?g|gif|webp|svg)$/i;
 
 // ファイル名が「別のファイル名の一部」ではなく、それ自体として書かれているか。
 // 「大地図.png」と書いてあっても「地図.png」は参照していないとみなす
-const FILE_NAME_BOUNDARY = /[\s[|=:/(（「『>"'*]/;
+// 「map.png.webp」と書いてあっても「map.png」は参照していないとみなす (前後の両方を確認する)
+const FILE_NAME_START_BOUNDARY = /[\s[|=:/(（「『>"'*]/;
+const FILE_NAME_END_BOUNDARY = /[\s\]|)）」』<"'*#,、。;]/;
 
 function mentionsFileName(text, fileName) {
   let index = text.indexOf(fileName);
   while (index !== -1) {
-    if (index === 0 || FILE_NAME_BOUNDARY.test(text[index - 1])) {
+    const before = text[index - 1];
+    const after = text[index + fileName.length];
+    if (
+      (before === undefined || FILE_NAME_START_BOUNDARY.test(before)) &&
+      (after === undefined || FILE_NAME_END_BOUNDARY.test(after))
+    ) {
       return true;
     }
     index = text.indexOf(fileName, index + 1);

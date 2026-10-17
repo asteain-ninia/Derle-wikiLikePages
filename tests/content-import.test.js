@@ -636,3 +636,13 @@ test("checkPublication does not publish frontmatter it cannot read simply", () =
     assert.deepEqual(checkPublication(source), { published: false, unreadable: false }, source);
   }
 });
+
+test("checkPublication accepts only an exact true value", () => {
+  const published = (value) => checkPublication(`---\n公開: ${value}\n---\n本文`).published;
+  for (const value of ["true", "True", '"true"', "'TRUE'", "true # 査読済み"]) {
+    assert.equal(published(value), true, value);
+  }
+  for (const value of ["t r u e", '"true # false"', '"true', "true!", "yes", "1"]) {
+    assert.equal(published(value), false, value);
+  }
+});

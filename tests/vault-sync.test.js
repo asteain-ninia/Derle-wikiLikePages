@@ -25,3 +25,12 @@ test("selectPublishedFiles does not treat a longer file name as a mention of a s
 
   assert.deepEqual(selectPublishedFiles(notes, images).files, ["位置.png", "公開.md", "国旗.png", "大地図.png"]);
 });
+
+test("selectPublishedFiles checks the boundary after the file name too", () => {
+  const notes = [{ path: "公開.md", text: "---\n公開: true\n---\n![[map.png.webp]] と ![[river.png|川]]" }];
+  assert.deepEqual(selectPublishedFiles(notes, ["map.png", "map.png.webp", "river.png"]).files, [
+    "map.png.webp",
+    "river.png",
+    "公開.md",
+  ]);
+});

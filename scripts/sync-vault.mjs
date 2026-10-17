@@ -4,7 +4,7 @@
 // 保管庫の場所は環境変数 DERLE_VAULT か、リポジトリ直下の local.config.json
 // ({ "vaultPath": "C:/Users/…/Obsidian" }、git 管理外) で指定する。
 import { existsSync } from "node:fs";
-import { copyFile, mkdir, readFile, readdir, rm, rmdir } from "node:fs/promises";
+import { lstat, mkdir, readFile, readdir, realpath, rm, rmdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -68,12 +68,27 @@ async function removeEmptyDirectories(directoryPath) {
   }
 }
 
-async function filesEqual(leftPath, rightPath) {
-  if (!existsSync(rightPath)) {
-    return false;
+async function sameContent(buffer, filePath) {
+  return existsSync(filePath) && buffer.equals(await readFile(filePath));
+}
+
+function isInside(childPath, parentPath) {
+  const relativePath = path.relative(parentPath, childPath);
+  return !relativePath.startsWith("..") && !path.isAbsolute(relativePath);
+}
+
+// content/ を消したり書き換えたりする前に、保管庫と取り違えていないことを確かめる。
+// content/ がリンク (ジャンクション) だと、ミラーの削除が保管庫の正本に及ぶため止める
+async function assertSafeLocations(vaultPath) {
+  if (existsSync(contentRoot) && (await lstat(contentRoot)).isSymbolicLink()) {
+    throw new Error(`content/ がリンク (ジャンクション) になっています: ${contentRoot}`);
   }
-  const [left, right] = await Promise.all([readFile(leftPath), readFile(rightPath)]);
-  return left.equals(right);
+
+  const realVault = await realpath(vaultPath);
+  const realProject = await realpath(projectRoot);
+  if (isInside(realVault, realProject) || isInside(realProject, realVault)) {
+    throw new Error(`保管庫とリポジトリが重なっています: ${realVault} / ${realProject}`);
+  }
 }
 
 export async function syncVault({ log = console.log } = {}) {
@@ -81,16 +96,20 @@ export async function syncVault({ log = console.log } = {}) {
   if (!existsSync(vaultPath)) {
     throw new Error(`保管庫が見つかりません: ${vaultPath}`);
   }
-  if (!path.relative(projectRoot, vaultPath).startsWith("..")) {
-    throw new Error(`保管庫がリポジトリの中を指しています: ${vaultPath}`);
-  }
+  await assertSafeLocations(vaultPath);
 
+  // 原稿は一度だけ読み、公開判定に使ったその内容をそのまま書き出す
+  // (判定後に保管庫で書き換えられても、判定していない内容が入らないように)
   const vaultFiles = await listFiles(vaultPath);
   const notes = await Promise.all(
     vaultFiles
       .filter((filePath) => NOTE_FILE.test(filePath))
-      .map(async (filePath) => ({ path: filePath, text: await readFile(path.join(vaultPath, filePath), "utf8") }))
+      .map(async (filePath) => {
+        const buffer = await readFile(path.join(vaultPath, filePath));
+        return { path: filePath, buffer, text: buffer.toString("utf8") };
+      })
   );
+  const noteBuffers = new Map(notes.map((note) => [note.path, note.buffer]));
   const imagePaths = vaultFiles.filter((filePath) => IMAGE_FILE.test(filePath));
   const selection = selectPublishedFiles(notes, imagePaths);
 
@@ -103,13 +122,14 @@ export async function syncVault({ log = console.log } = {}) {
   const targetFiles = new Set(selection.files);
   let copiedCount = 0;
   for (const filePath of selection.files) {
-    const sourcePath = path.join(vaultPath, filePath);
     const destinationPath = path.join(contentRoot, filePath);
-    if (await filesEqual(sourcePath, destinationPath)) {
+    const noteBuffer = noteBuffers.get(filePath);
+    const buffer = noteBuffer ?? (await readFile(path.join(vaultPath, filePath)));
+    if (await sameContent(buffer, destinationPath)) {
       continue;
     }
     await mkdir(path.dirname(destinationPath), { recursive: true });
-    await copyFile(sourcePath, destinationPath);
+    await writeFile(destinationPath, buffer);
     copiedCount += 1;
   }
 

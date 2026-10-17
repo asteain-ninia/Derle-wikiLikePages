@@ -1127,9 +1127,8 @@ const SIMPLE_KEY_LINE = /^([\p{L}\p{N}_-]+):(?:\s+(.*))?$/u;
 const LIST_ITEM_LINE = /^\s*-\s+\S/;
 const COMPLEX_SCALAR = /^[|>{[&*!]/;
 
-function normalizeFlagValue(rawValue) {
-  return rawValue.replace(/\s+#.*$/, "").replace(/["'\s]/g, "").toLowerCase();
-}
+// 値が厳密に true / "true" / 'true' (大文字小文字は問わない、後ろに # コメント可) のときだけ真
+const TRUE_FLAG_VALUE = /^(?:true|"true"|'true')(?:\s+#.*)?$/i;
 
 // frontmatter を単純な形として読めれば { キー: 値 (リストなら null) } を、読めなければ null を返す
 function readSimpleFrontmatter(source) {
@@ -1188,7 +1187,7 @@ export function checkPublication(sourceText) {
 
   const rawValue = frontmatter[PUBLISH_KEY];
   return {
-    published: typeof rawValue === "string" && normalizeFlagValue(rawValue) === "true",
+    published: typeof rawValue === "string" && TRUE_FLAG_VALUE.test(rawValue.trim()),
     unreadable: false,
   };
 }
