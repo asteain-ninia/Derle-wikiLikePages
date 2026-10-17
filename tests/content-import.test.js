@@ -619,3 +619,16 @@ test("parseFrontmatter keeps # inside quoted values", () => {
   const { data } = parseFrontmatter('---\ntitle: "C# 入門" # コメント\n---\n本文');
   assert.equal(data.title, "C# 入門");
 });
+
+test("getUnpublishedReason also catches quoted keys in the raw frontmatter", () => {
+  assert.equal(getUnpublishedReason('---\n"公開": false\n---\n本文'), "公開: false");
+  assert.equal(getUnpublishedReason("---\n'draft': true\n---\n本文"), "draft: true");
+  assert.equal(getUnpublishedReason("---\n  種別 : 'メタ'\n---\n本文"), "種別: メタ");
+  assert.equal(getUnpublishedReason("本文中に 公開: false と書いただけ"), null);
+});
+
+test("parseFrontmatter keeps escaped quotes and # inside quoted values", () => {
+  const { data } = parseFrontmatter('---\ntitle: "引用符 \\" # 記号" # コメント\nsub: \'It\'\'s # ok\'\n---\n本文');
+  assert.equal(data.title, '引用符 " # 記号');
+  assert.equal(data.sub, "It's # ok");
+});
