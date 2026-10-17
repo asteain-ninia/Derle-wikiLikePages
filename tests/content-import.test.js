@@ -632,6 +632,9 @@ test("getUnpublishedReason is fail-closed for frontmatter it cannot read simply"
     '{"公開": false, "title": "内部資料"}\n本文', // JSON 形式
     "---\n公開:\n  - false\n---\n本文", // 判定キーがリスト
     "---\n種別: 国\n本文 (閉じていない frontmatter)",
+    "---\n公開: false\n公開: true\n---\n本文", // 重複キー
+    "---\ndraft: true\nDraft: false\n---\n本文",
+    '---\n種別: "\\u30e1\\u30bf"\n---\n本文', // エスケープ入りの値
   ];
   for (const source of unsupported) {
     assert.equal(getUnpublishedReason(source), UNSUPPORTED_FRONTMATTER, source);

@@ -1175,6 +1175,10 @@ function readSimpleFrontmatter(source) {
     }
 
     lastKey = keyMatch[1].toLowerCase();
+    // 同じキー (大文字小文字違いを含む) が重なると、どちらが効くか書き方次第になるので解釈しない
+    if (lastKey in values) {
+      return null;
+    }
     // 値が空のキーは、続く `- 項目` を持つリストとして扱う
     values[lastKey] = keyMatch[2]?.trim() ? keyMatch[2] : null;
   }
@@ -1200,10 +1204,13 @@ export function getUnpublishedReason(sourceText) {
     if (!(key.toLowerCase() in frontmatter)) {
       continue;
     }
-    // 判定に使うキーがリスト形式なら、中身を推測せずに非公開にする
+    // 判定に使うキーがリスト形式やエスケープ入り ("メ…") なら、中身を推測せずに非公開にする
     const rawValue = frontmatter[key.toLowerCase()];
-    if (rawValue === null || normalizeFlagValue(rawValue) === value) {
-      return rawValue === null ? UNSUPPORTED_FRONTMATTER : reason;
+    if (rawValue === null || rawValue.includes("\\")) {
+      return UNSUPPORTED_FRONTMATTER;
+    }
+    if (normalizeFlagValue(rawValue) === value) {
+      return reason;
     }
   }
 
