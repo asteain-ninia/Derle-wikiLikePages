@@ -324,11 +324,11 @@ test("buildArticleRecord extracts [[Category:...]] as tags", () => {
     fileBasename: "テスト",
     created: "2026-03-20",
     updated: "2026-03-23",
-    sourceText: `本文。\n[[Category:ガフィーク]][[Category:ティネブリスの国]]`,
+    sourceText: `本文。\n[[Category:テスト国]][[Category:架空の地域]]`,
   });
 
-  assert.ok(article.tags.includes("ガフィーク"));
-  assert.ok(article.tags.includes("ティネブリスの国"));
+  assert.ok(article.tags.includes("テスト国"));
+  assert.ok(article.tags.includes("架空の地域"));
 });
 
 test("buildArticleRecord converts [[ファイル:...]] to embed syntax", () => {
@@ -357,14 +357,14 @@ test("buildArticleRecord infers title from MediaWiki bold ('''タイトル''')",
 
 test("buildArticleRecord strips file extension from id for .wiki files", () => {
   const article = buildArticleRecord({
-    relativePath: "qafik.wiki",
-    fileBasename: "qafik",
+    relativePath: "article.wiki",
+    fileBasename: "article",
     created: "2026-03-20",
     updated: "2026-03-23",
     sourceText: `本文。`,
   });
 
-  assert.equal(article.id, "qafik");
+  assert.equal(article.id, "article");
 });
 
 test("parseMarkdownSections handles {{main|...}} as main-article link", () => {
@@ -557,16 +557,16 @@ test("findDuplicateEntryIds reports files whose ids collide after dropping the e
   const build = (relativePath) =>
     buildArticleRecord({
       relativePath,
-      fileBasename: "qafik",
+      fileBasename: "article",
       sourceText: "本文",
       created: "2026-01-01",
       updated: "2026-01-01",
     });
 
-  const entries = [build("qafik.md"), build("qafik.wiki"), build("other/qafik.md")];
+  const entries = [build("article.md"), build("article.wiki"), build("other/article.md")];
 
   assert.deepEqual(findDuplicateEntryIds(entries), [
-    { id: "qafik", sourcePaths: ["qafik.md", "qafik.wiki"] },
+    { id: "article", sourcePaths: ["article.md", "article.wiki"] },
   ]);
 });
 
