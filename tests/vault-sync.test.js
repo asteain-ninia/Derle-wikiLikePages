@@ -18,3 +18,10 @@ test("selectPublishedFiles keeps only 公開: true notes and the images they men
     unreadableNotes: ["壊れ.md"],
   });
 });
+
+test("selectPublishedFiles does not treat a longer file name as a mention of a shorter one", () => {
+  const notes = [{ path: "公開.md", text: "---\n公開: true\n---\n![[大地図.png]] と [[File:画像/位置.png|100px]] と |国旗画像=国旗.png" }];
+  const images = ["地図.png", "大地図.png", "位置.png", "国旗.png", "旗.png"];
+
+  assert.deepEqual(selectPublishedFiles(notes, images).files, ["位置.png", "公開.md", "国旗.png", "大地図.png"]);
+});
