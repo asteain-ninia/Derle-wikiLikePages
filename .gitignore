@@ -2,3 +2,6 @@ dist/
 
 src/data/generated/
 /.claude
+
+# Obsidian の端末ごとの設定
+/content/.obsidian/

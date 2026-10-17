@@ -31,8 +31,10 @@ function formatDate(dateLike) {
 }
 
 const CONTENT_FILE_EXTENSIONS = /\.(md|wiki|txt)$/i;
+const IMAGE_FILE_EXTENSIONS = /\.(png|jpe?g|gif|webp|svg)$/i;
 
-async function collectContentFiles(directoryPath) {
+// ドットで始まるファイル・フォルダ (.obsidian など) を除いた content/ 配下の全ファイル
+async function collectFiles(directoryPath) {
   const directoryEntries = await readdir(directoryPath, { withFileTypes: true });
   const collected = [];
 
@@ -43,11 +45,11 @@ async function collectContentFiles(directoryPath) {
 
     const absolutePath = path.join(directoryPath, entry.name);
     if (entry.isDirectory()) {
-      collected.push(...(await collectContentFiles(absolutePath)));
+      collected.push(...(await collectFiles(absolutePath)));
       continue;
     }
 
-    if (entry.isFile() && CONTENT_FILE_EXTENSIONS.test(entry.name)) {
+    if (entry.isFile()) {
       collected.push(absolutePath);
     }
   }
@@ -133,10 +135,14 @@ function sortEntries(entries) {
 }
 
 async function buildContentData() {
-  const markdownFiles = await collectContentFiles(contentRoot);
+  const allFiles = await collectFiles(contentRoot);
+  const markdownFiles = allFiles.filter((filePath) => CONTENT_FILE_EXTENSIONS.test(filePath));
   const templateHandlers = await loadTemplateHandlers(templatesDir);
   const entries = [];
-  const unpublishedPaths = [];
+  // 記事でも画像でもないファイル (辞書 json・docx・Obsidian の .base など) は公開しない
+  const unpublishedPaths = allFiles
+    .filter((filePath) => !CONTENT_FILE_EXTENSIONS.test(filePath) && !IMAGE_FILE_EXTENSIONS.test(filePath))
+    .map((filePath) => toPosixPath(path.relative(projectRoot, filePath)));
 
   for (const absolutePath of markdownFiles) {
     const relativeToContent = toPosixPath(path.relative(contentRoot, absolutePath));
