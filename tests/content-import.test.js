@@ -632,3 +632,13 @@ test("parseFrontmatter keeps escaped quotes and # inside quoted values", () => {
   assert.equal(data.title, '引用符 " # 記号');
   assert.equal(data.sub, "It's # ok");
 });
+
+test("getUnpublishedReason reads flags conservatively regardless of YAML style", () => {
+  assert.equal(getUnpublishedReason('---\n"公開": false\n--- \n本文'), "公開: false");
+  assert.equal(getUnpublishedReason('--- \n"公開": " false "\n---\n本文'), "公開: false");
+  assert.equal(getUnpublishedReason("---\n種別: |-\n  メタ\n---\n本文"), "種別: メタ");
+  assert.equal(getUnpublishedReason("---\n種別: >\n  メタ # 規約\n---\n本文"), "種別: メタ");
+  assert.equal(getUnpublishedReason("---\nDraft: TRUE\n---\n本文"), "draft: true");
+  assert.equal(getUnpublishedReason("---\n種別: メタデータ論\n公開: falsey\n---\n本文"), null);
+  assert.equal(getUnpublishedReason("---\n種別: 国\n---\n本文\n公開: false"), null);
+});

@@ -128,7 +128,7 @@ function parseListValue(rawValue) {
 
 export function parseFrontmatter(sourceText) {
   const source = normalizeNewlines(sourceText);
-  if (!source.startsWith("---\n")) {
+  if (source.split("\n", 1)[0].trim() !== "---") {
     return {
       data: {},
       body: source,
@@ -1119,51 +1119,74 @@ function buildTemplateModels(templates, templateHandlers) {
 
 const UNREVIEWED_CALLOUT = /^\s*>\s*\[!caution\][-+]?\s*未査読/im;
 
-// frontmatter の生テキストに対する保守的な判定。キーや値の引用符・行末コメントの有無に関係なく
-// 該当しそうな行があれば非公開とみなす (簡易 YAML パーサーの取りこぼしで公開されないようにするため)
-const RAW_UNPUBLISHED_FLAGS = [
-  { reason: "種別: メタ", pattern: /^\s*["']?種別["']?\s*:\s*["']?メタ["']?\s*(?:#.*)?$/m },
-  { reason: "公開: false", pattern: /^\s*["']?公開["']?\s*:\s*["']?false["']?\s*(?:#.*)?$/im },
-  { reason: "draft: true", pattern: /^\s*["']?draft["']?\s*:\s*["']?true["']?\s*(?:#.*)?$/im },
+// 非公開の判定は簡易 YAML パーサーを通さず、frontmatter の生テキストを保守的に読む。
+// キー・値の引用符、前後の空白、行末コメント、ブロック形式 (|- の次行に値) の有無に関係なく、
+// 該当しそうなら非公開とみなす (誤って非公開になるのは許容、誤って公開されるのは不可)。
+const UNPUBLISHED_FLAGS = [
+  { key: "種別", value: "メタ", reason: "種別: メタ" },
+  { key: "公開", value: "false", reason: "公開: false" },
+  { key: "draft", value: "true", reason: "draft: true" },
 ];
 
-function extractRawFrontmatter(source) {
-  const match = /^---\n([\s\S]*?)\n---(?:\n|$)/.exec(source);
-  return match ? match[1] : "";
+function extractRawFrontmatterLines(source) {
+  const lines = source.split("\n");
+  if (lines[0]?.trim() !== "---") {
+    return [];
+  }
+
+  const closingIndex = lines.findIndex((line, index) => index > 0 && line.trim() === "---");
+  return closingIndex === -1 ? [] : lines.slice(1, closingIndex);
+}
+
+function normalizeRawFlagValue(text) {
+  return text
+    .split("\n")
+    .map((line) => line.replace(/(^|\s)#.*$/, ""))
+    .join(" ")
+    .replace(/^\s*[|>][-+]?/, "")
+    .replace(/["'\s]/g, "")
+    .toLowerCase();
+}
+
+function readRawFlagValues(frontmatterLines, key) {
+  const keyPattern = new RegExp(`^\\s*["']?${key}["']?\\s*:(.*)$`, "i");
+  const values = [];
+
+  frontmatterLines.forEach((line, index) => {
+    const keyMatch = keyPattern.exec(line);
+    if (!keyMatch) {
+      return;
+    }
+
+    // 値の続き (字下げされた後続行) もまとめて読む
+    const continuation = [];
+    for (const nextLine of frontmatterLines.slice(index + 1)) {
+      if (!/^\s+\S/.test(nextLine)) {
+        break;
+      }
+      continuation.push(nextLine);
+    }
+    values.push(normalizeRawFlagValue([keyMatch[1], ...continuation].join("\n")));
+  });
+
+  return values;
 }
 
 // 公開しない原稿なら理由を、公開してよければ null を返す。
 // ここで弾いた原稿はビルドに含めず、git にもコミットさせない (.git/info/exclude と pre-commit フック)。
 export function getUnpublishedReason(sourceText) {
   const source = normalizeNewlines(sourceText);
-  const { data } = parseFrontmatter(source);
 
   if (UNREVIEWED_CALLOUT.test(source)) {
     return "未査読";
   }
 
-  const rawFrontmatter = extractRawFrontmatter(source);
-  const rawFlag = RAW_UNPUBLISHED_FLAGS.find(({ pattern }) => pattern.test(rawFrontmatter));
-  if (rawFlag) {
-    return rawFlag.reason;
-  }
+  const frontmatterLines = extractRawFrontmatterLines(source);
+  const flag = UNPUBLISHED_FLAGS.find(({ key, value }) =>
+    readRawFlagValues(frontmatterLines, key).includes(value)
+  );
 
-  // 引用符付き ("false") でも同じ意味として扱う
-  const isFlag = (value, expected) => String(value ?? "").trim().toLowerCase() === expected;
-
-  if (String(data["種別"] ?? "").trim() === "メタ") {
-    return "種別: メタ";
-  }
-
-  if (isFlag(data["公開"], "false")) {
-    return "公開: false";
-  }
-
-  if (isFlag(data.draft, "true")) {
-    return "draft: true";
-  }
-
-  return null;
+  return flag ? flag.reason : null;
 }
 
 export function findDuplicateEntryIds(entries) {
