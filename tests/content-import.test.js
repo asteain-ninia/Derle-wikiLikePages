@@ -647,6 +647,7 @@ test("getUnpublishedReason reads simple frontmatter and stays publishable otherw
   assert.equal(getUnpublishedReason("---\n種別: メタデータ論\n公開: falsey\n---\n本文"), null);
   assert.equal(getUnpublishedReason("---\n種別: 国\ntags:\n  - 地理\n---\n本文\n公開: false"), null);
   assert.equal(getUnpublishedReason("本文中に 公開: false と書いただけ"), null);
+  assert.equal(getUnpublishedReason("{{架空|デーレ界}}\n{{基礎情報 国\n|訳国名=テスト\n}}\n本文"), null);
 });
 
 test("parseFrontmatter keeps escaped quotes and # inside quoted values", () => {

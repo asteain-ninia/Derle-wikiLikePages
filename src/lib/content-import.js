@@ -1143,7 +1143,8 @@ function normalizeFlagValue(rawValue) {
 function readSimpleFrontmatter(source) {
   const lines = source.split("\n");
   const firstLine = lines[0]?.trim() ?? "";
-  if (firstLine.startsWith("{")) {
+  // JSON 形式の frontmatter ({"公開": false}) は解釈しない。{{テンプレート}} で始まる本文は対象外
+  if (/^\{(?!\{)/.test(firstLine)) {
     return null;
   }
   if (firstLine !== "---") {
