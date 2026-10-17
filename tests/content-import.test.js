@@ -5,6 +5,7 @@ import {
   buildArticleRecord,
   extractLeadingTemplates,
   findDuplicateEntryIds,
+  getUnpublishedReason,
   parseFrontmatter,
   parseMarkdownSections,
 } from "../src/lib/content-import.js";
@@ -580,4 +581,19 @@ test("buildArticleRecord summary keeps intraword underscores and drops link synt
   });
 
   assert.equal(record.summary, "snake_case_name と 資料 と 強調");
+});
+
+test("parseFrontmatter reads Japanese keys", () => {
+  const { data } = parseFrontmatter("---\n種別: 国\n公開: false\n---\n本文");
+  assert.equal(data["種別"], "国");
+  assert.equal(data["公開"], false);
+});
+
+test("getUnpublishedReason detects unreviewed stubs, meta notes and opt-out notes", () => {
+  assert.equal(getUnpublishedReason("---\n種別: 国\n---\n> [!caution] 未査読\n> 下書き\n\n本文"), "未査読");
+  assert.equal(getUnpublishedReason("---\r\n種別: 地形\r\n---\r\n> [!caution] 未査読\r\n本文"), "未査読");
+  assert.equal(getUnpublishedReason("---\n種別: メタ\n---\n# 規約"), "種別: メタ");
+  assert.equal(getUnpublishedReason("---\n公開: false\n---\n書きかけ"), "公開: false");
+  assert.equal(getUnpublishedReason("---\n種別: 国\n---\n本文で未査読という語に触れるだけ"), null);
+  assert.equal(getUnpublishedReason("frontmatter なしの本文"), null);
 });

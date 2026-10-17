@@ -1,4 +1,4 @@
-import { articles, contentBuildInfo } from "./data/articles.js";
+import { articles } from "./data/articles.js";
 import { siteConfig } from "./data/site-config.js";
 import {
   buildHomePageModel,
@@ -59,12 +59,9 @@ const state = {
 
 function renderWelcomeSummary() {
   const { articleCount, categoryCount, latestUpdatedDate } = homePageModel.stats;
-  const fallbackNote = contentBuildInfo.usingSamplesFallback
-    ? "（現在はサンプル記事を表示しています）"
-    : "";
   elements.welcomeSummary.textContent =
     `現在 ${articleCount} 件の記事と ${categoryCount} つのカテゴリがあります。` +
-    ` 最終更新: ${formatDisplayDate(latestUpdatedDate)}。${fallbackNote}`;
+    ` 最終更新: ${formatDisplayDate(latestUpdatedDate)}。`;
 }
 
 function renderFeaturedState() {

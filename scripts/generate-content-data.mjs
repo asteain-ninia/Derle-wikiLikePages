@@ -3,7 +3,11 @@ import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { buildArticleRecord, findDuplicateEntryIds } from "../src/lib/content-import.js";
+import {
+  buildArticleRecord,
+  findDuplicateEntryIds,
+  getUnpublishedReason,
+} from "../src/lib/content-import.js";
 import { loadTemplateHandlers } from "../src/lib/template-registry.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -132,12 +136,18 @@ async function buildContentData() {
   const markdownFiles = await collectContentFiles(contentRoot);
   const templateHandlers = await loadTemplateHandlers(templatesDir);
   const entries = [];
+  const unpublishedPaths = [];
 
   for (const absolutePath of markdownFiles) {
     const relativeToContent = toPosixPath(path.relative(contentRoot, absolutePath));
     const repoRelativePath = toPosixPath(path.relative(projectRoot, absolutePath));
     const fileBasename = path.basename(absolutePath, path.extname(absolutePath));
     const sourceText = await readFile(absolutePath, "utf8");
+    if (getUnpublishedReason(sourceText)) {
+      unpublishedPaths.push(repoRelativePath);
+      continue;
+    }
+
     const dates = await getFileDates(absolutePath, repoRelativePath);
     const history = getGitHistory(repoRelativePath);
 
@@ -163,21 +173,64 @@ async function buildContentData() {
     );
   }
 
-  const nonDraftEntries = entries.filter((entry) => !entry.draft);
-  const publishableEntries = nonDraftEntries.filter((entry) => !entry.isSample);
-  const selectedEntries =
-    publishableEntries.length > 0 ? publishableEntries : nonDraftEntries;
+  const publishedEntries = entries.filter((entry) => !entry.draft);
 
   return {
+    unpublishedPaths,
     contentBuildInfo: {
       totalMarkdownFiles: markdownFiles.length,
-      loadedArticleCount: nonDraftEntries.length,
-      publishableArticleCount: publishableEntries.length,
-      usingSamplesFallback: publishableEntries.length === 0 && nonDraftEntries.length > 0,
+      unpublishedFileCount: unpublishedPaths.length,
+      publishedArticleCount: publishedEntries.length,
       generatedAt: new Date().toISOString(),
     },
-    generatedArticles: sortEntries(selectedEntries),
+    generatedArticles: sortEntries(publishedEntries),
   };
+}
+
+const EXCLUDE_BLOCK_START = "# >>> build:content が自動生成: 非公開の原稿 (手で編集しない) >>>";
+const EXCLUDE_BLOCK_END = "# <<< build:content <<<";
+
+function escapeGitignorePath(repoRelativePath) {
+  return `/${repoRelativePath.replace(/[\\*?[\]!#]/g, "\\$&")}`;
+}
+
+// 非公開の原稿を .git/info/exclude に載せ、うっかりコミットされないようにする。
+// リポジトリに含まれる .gitignore ではなくローカル専用の exclude を使うのは、
+// 未公開記事のファイル名 (= タイトル) を公開リポジトリに出さないため。
+async function updateGitExclude(unpublishedPaths) {
+  let excludePath;
+  try {
+    excludePath = path.resolve(
+      projectRoot,
+      execFileSync("git", ["rev-parse", "--git-path", "info/exclude"], {
+        cwd: projectRoot,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      }).trim()
+    );
+  } catch {
+    return;
+  }
+
+  let current = "";
+  try {
+    current = await readFile(excludePath, "utf8");
+  } catch {
+    // exclude がまだ無ければ新規に作る
+  }
+
+  const blockPattern = new RegExp(
+    `\\n?${EXCLUDE_BLOCK_START.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[\\s\\S]*?${EXCLUDE_BLOCK_END.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\n?`
+  );
+  const withoutBlock = current.replace(blockPattern, "\n").replace(/\n+$/, "");
+  const block = [
+    EXCLUDE_BLOCK_START,
+    ...[...unpublishedPaths].sort().map(escapeGitignorePath),
+    EXCLUDE_BLOCK_END,
+  ].join("\n");
+
+  await mkdir(path.dirname(excludePath), { recursive: true });
+  await writeFile(excludePath, `${withoutBlock ? `${withoutBlock}\n\n` : ""}${block}\n`, "utf8");
 }
 
 function serializeModule({ contentBuildInfo, generatedArticles }) {
@@ -187,7 +240,9 @@ function serializeModule({ contentBuildInfo, generatedArticles }) {
 const contentData = await buildContentData();
 await mkdir(generatedDataDir, { recursive: true });
 await writeFile(generatedDataPath, serializeModule(contentData), "utf8");
+await updateGitExclude(contentData.unpublishedPaths);
 
 console.log(
-  `Generated ${contentData.generatedArticles.length} article records at ${path.relative(projectRoot, generatedDataPath)}`
+  `Generated ${contentData.generatedArticles.length} article records at ${path.relative(projectRoot, generatedDataPath)}` +
+    ` (非公開 ${contentData.unpublishedPaths.length} 件は除外)`
 );

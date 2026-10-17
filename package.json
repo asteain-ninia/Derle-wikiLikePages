@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "prepare": "git config core.hooksPath .githooks",
     "build:content": "node scripts/generate-content-data.mjs",
     "build:site": "node scripts/build-site.mjs",
     "dev": "node scripts/dev-server.mjs",

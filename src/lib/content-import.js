@@ -152,7 +152,7 @@ export function parseFrontmatter(sourceText) {
       continue;
     }
 
-    const keyMatch = /^([A-Za-z0-9_-]+):\s*(.*)$/.exec(line);
+    const keyMatch = /^([\p{L}\p{N}_-]+):\s*(.*)$/u.exec(line);
     if (keyMatch) {
       const [, key, rawValue] = keyMatch;
       currentKey = key;
@@ -1100,6 +1100,29 @@ function buildTemplateModels(templates, templateHandlers) {
     .filter(Boolean);
 }
 
+const UNREVIEWED_CALLOUT = /^> \[!caution\] 未査読/m;
+
+// 公開しない原稿なら理由を、公開してよければ null を返す。
+// ここで弾いた原稿はビルドに含めず、git にもコミットさせない (.git/info/exclude と pre-commit フック)。
+export function getUnpublishedReason(sourceText) {
+  const source = normalizeNewlines(sourceText);
+  const { data } = parseFrontmatter(source);
+
+  if (UNREVIEWED_CALLOUT.test(source)) {
+    return "未査読";
+  }
+
+  if (data["種別"] === "メタ") {
+    return "種別: メタ";
+  }
+
+  if (data["公開"] === false) {
+    return "公開: false";
+  }
+
+  return null;
+}
+
 export function findDuplicateEntryIds(entries) {
   const sourcePathsById = new Map();
   for (const entry of entries) {
@@ -1196,6 +1219,5 @@ export function buildArticleRecord({
     isRedirect,
     redirectTarget,
     draft: frontmatter.draft === true,
-    isSample: relativePath.replace(/\\/g, "/").startsWith("samples/"),
   };
 }
