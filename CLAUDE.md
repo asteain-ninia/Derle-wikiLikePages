@@ -8,7 +8,7 @@
 
 ## 正本は OneDrive の Obsidian 保管庫、content/ はそのミラー
 
-- 正本: `C:/Users/tatuk/OneDrive/ドキュメント/Obsidian` (2 台の PC で OneDrive 同期。未査読スタブ・辞書なども全部ここ)
+- 正本: `C:/Users/…/OneDrive/ドキュメント/Obsidian` (2 台の PC で OneDrive 同期。未査読スタブ・辞書なども全部ここ)
 - `npm run sync` が保管庫から **frontmatter に `公開: true` がある原稿** と、それらが名前を書いている画像だけを `content/` にコピーする。`content/` は生成物で、保管庫に無いもの・公開をやめたものは消える。`content/` を直接編集しない
 - 保管庫の場所は PC ごとに `local.config.json` (`{ "vaultPath": "…" }`、git 管理外) か環境変数 `DERLE_VAULT` で指定
 - `npm run dev` は保管庫も監視し、保存のたびに同期 → ビルド → ブラウザ再読み込み
