@@ -31,6 +31,7 @@ const mimeTypes = {
   ".svg": "image/svg+xml",
   ".txt": "text/plain; charset=utf-8",
   ".webp": "image/webp",
+  ".woff2": "font/woff2",
 };
 
 function getContentType(filePath) {
