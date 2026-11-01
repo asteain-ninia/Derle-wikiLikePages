@@ -716,6 +716,11 @@ html[data-file-protocol="true"] .protocol-warning {
   margin-bottom: 0;
 }
 
+/* 転写などの語を途中で折らないよう、画面に収まらない表はページではなく表だけを横スクロールさせる */
+.wikitable-scroll {
+  overflow-x: auto;
+}
+
 .wikitable {
   border-collapse: collapse;
   margin: 12px 0;
@@ -737,8 +742,6 @@ html[data-file-protocol="true"] .protocol-warning {
   border: 1px solid var(--color-border-soft);
   padding: 6px 8px;
   vertical-align: top;
-  /* 表のセルは break-word では最小幅が縮まないため、URL などの長い語も折り返させる */
-  overflow-wrap: anywhere;
 }
 
 .wikitable th {

@@ -395,6 +395,42 @@ test("renderInlineMarkdown preserves <br> tags", () => {
   assert.doesNotMatch(result, /&lt;br/);
 });
 
+test("renderArticlePage renders table cell alignment", () => {
+  const rendered = renderArticlePage({
+    id: "t1",
+    title: "表",
+    category: "記事",
+    created: "2026-03-20",
+    updated: "2026-03-23",
+    summary: "表",
+    aliases: [],
+    tags: [],
+    unresolvedLinkCount: 0,
+    backlinks: [],
+    sections: [
+      {
+        heading: "概要",
+        anchorId: "section-概要",
+        paragraphs: [
+          {
+            type: "table",
+            caption: "",
+            rows: [
+              [
+                { isHeader: true, text: "語", align: "center" },
+                { isHeader: true, text: "意味" },
+              ],
+            ],
+          },
+        ],
+      },
+    ],
+    templateModels: [],
+  });
+
+  assert.match(rendered, /<th style="text-align: center">語<\/th><th>意味<\/th>/);
+});
+
 test("renderArticlePage renders wikitable from table paragraphs", () => {
   const rendered = renderArticlePage({
     id: "t1",

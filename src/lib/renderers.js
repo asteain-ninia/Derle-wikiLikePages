@@ -201,6 +201,9 @@ function renderWikiTable(tableModel) {
           if (cell.colspan && cell.colspan > 1) {
             attrs.push(`colspan="${cell.colspan}"`);
           }
+          if (cell.align) {
+            attrs.push(`style="text-align: ${cell.align}"`);
+          }
           const attrStr = attrs.length > 0 ? ` ${attrs.join(" ")}` : "";
           const content = cell.segments
             ? renderParagraphSegments(cell.segments)
@@ -212,7 +215,7 @@ function renderWikiTable(tableModel) {
     })
     .join("");
 
-  return `<table class="wikitable">${captionHtml}<tbody>${rowsHtml}</tbody></table>`;
+  return `<div class="wikitable-scroll"><table class="wikitable">${captionHtml}<tbody>${rowsHtml}</tbody></table></div>`;
 }
 
 function renderBlockquote(blockquoteModel) {

@@ -488,6 +488,86 @@ function parseMediaWikiTable(lines, startIndex) {
   return { type: "table", caption, rows, endIndex };
 }
 
+// \| は文字としての縦棒、[[記事|表示名]] の中の縦棒はセルの区切りではない
+function splitMarkdownTableRow(line) {
+  const body = line.trim().replace(/^\|/, "");
+  const cells = [];
+  let current = "";
+  let insideLink = false;
+
+  for (let index = 0; index < body.length; index += 1) {
+    if (body.startsWith("\\|", index)) {
+      current += "|";
+      index += 1;
+      continue;
+    }
+    if (body.startsWith("[[", index)) {
+      insideLink = true;
+    } else if (body.startsWith("]]", index)) {
+      insideLink = false;
+    }
+    if (body[index] === "|" && !insideLink) {
+      cells.push(current.trim());
+      current = "";
+      continue;
+    }
+    current += body[index];
+  }
+
+  if (current.trim()) {
+    cells.push(current.trim());
+  }
+  return cells;
+}
+
+function parseMarkdownTableAlignments(line) {
+  const cells = splitMarkdownTableRow(line);
+  if (cells.length === 0 || !cells.every((cell) => /^:?-+:?$/.test(cell))) {
+    return null;
+  }
+  return cells.map((cell) => {
+    if (cell.startsWith(":") && cell.endsWith(":")) {
+      return "center";
+    }
+    if (cell.endsWith(":")) {
+      return "right";
+    }
+    return cell.startsWith(":") ? "left" : null;
+  });
+}
+
+// ヘッダー行の次に同じ列数の区切り行があるときだけ表とみなす (テンプレートの |キー=値 や MediaWiki の行区切り |- を巻き込まない)
+function parseMarkdownTable(lines, startIndex) {
+  const headerLine = lines[startIndex].trim();
+  const separatorLine = lines[startIndex + 1]?.trim();
+  if (!headerLine.startsWith("|") || !separatorLine?.startsWith("|") || separatorLine === "|-") {
+    return null;
+  }
+
+  const alignments = parseMarkdownTableAlignments(separatorLine);
+  const headerCells = splitMarkdownTableRow(headerLine);
+  if (!alignments || headerCells.length !== alignments.length) {
+    return null;
+  }
+
+  const buildRow = (cells, isHeader) =>
+    alignments.map((align, columnIndex) => ({
+      isHeader,
+      text: cells[columnIndex] ?? "",
+      ...(align ? { align } : {}),
+    }));
+
+  // Markdown の表はヘッダー行を省略できないため、見出しのない表は空のヘッダー行で書かれる。描画はしない
+  const rows = headerCells.some(Boolean) ? [buildRow(headerCells, true)] : [];
+  let endIndex = startIndex + 2;
+  while (endIndex < lines.length && lines[endIndex].trim().startsWith("|")) {
+    rows.push(buildRow(splitMarkdownTableRow(lines[endIndex]), false));
+    endIndex += 1;
+  }
+
+  return { type: "table", caption: "", rows, endIndex };
+}
+
 function parseCellAttrsAndText(raw) {
   const pipeIndex = raw.indexOf("|");
   if (pipeIndex === -1 || /\[\[/.test(raw.slice(0, pipeIndex))) {
@@ -694,6 +774,18 @@ function buildParagraphs(lines) {
         lineIndex = table.endIndex;
         continue;
       }
+    }
+
+    const markdownTable = parseMarkdownTable(lines, lineIndex);
+    if (markdownTable) {
+      flushParagraph();
+      paragraphs.push({
+        type: "table",
+        caption: markdownTable.caption,
+        rows: markdownTable.rows,
+      });
+      lineIndex = markdownTable.endIndex;
+      continue;
     }
 
     if (trimmed.includes("<blockquote>")) {

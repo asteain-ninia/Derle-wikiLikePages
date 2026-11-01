@@ -257,6 +257,65 @@ test("parseMarkdownSections parses MediaWiki tables ({| ... |})", () => {
   assert.equal(sections[0].paragraphs[2], "続き。");
 });
 
+test("parseMarkdownSections parses Markdown tables with alignment", () => {
+  const sections = parseMarkdownSections(`本文。
+| 語 | 品詞 | 意味 | 備考 |
+|:---:|---:|:---|---|
+| *eni* | 名詞 | ペン |
+| *Cxin* | 動詞 | 歌う | 例 | 余り |
+後文。`);
+
+  const [before, table, after] = sections[0].paragraphs;
+  assert.equal(before, "本文。");
+  assert.equal(after, "後文。");
+  assert.equal(table.type, "table");
+  assert.equal(table.rows.length, 3);
+  assert.deepEqual(table.rows[0].map((cell) => cell.isHeader), [true, true, true, true]);
+  assert.deepEqual(table.rows[0].map((cell) => cell.align), ["center", "right", "left", undefined]);
+  // 足りないセルは空で埋め、多いセルは捨てて、ヘッダーの列数にそろえる
+  assert.deepEqual(table.rows[1].map((cell) => cell.text), ["*eni*", "名詞", "ペン", ""]);
+  assert.deepEqual(table.rows[2].map((cell) => cell.text), ["*Cxin*", "動詞", "歌う", "例"]);
+  assert.equal(table.rows[1][0].isHeader, false);
+});
+
+test("parseMarkdownSections drops an empty Markdown table header", () => {
+  const [table] = parseMarkdownSections(`|   |   |
+| - | - |
+| 半径 | 6682.41 |`)[0].paragraphs;
+
+  assert.equal(table.rows.length, 1);
+  assert.equal(table.rows[0][0].text, "半径");
+  assert.equal(table.rows[0][0].isHeader, false);
+});
+
+test("parseMarkdownSections keeps escaped pipes and wiki links in Markdown table cells", () => {
+  const [table] = parseMarkdownSections(`| 記事 | 記号 |
+| --- | --- |
+| [[デーレ語\\|出語]] | a\\|b |
+| [[デーレ語|出語]] | c |`)[0].paragraphs;
+
+  assert.deepEqual(table.rows[1].map((cell) => cell.text), ["[[デーレ語|出語]]", "a|b"]);
+  assert.deepEqual(table.rows[2].map((cell) => cell.text), ["[[デーレ語|出語]]", "c"]);
+});
+
+test("parseMarkdownSections does not treat pipes without a matching separator as a table", () => {
+  for (const source of [
+    "| a | b |\n後の文",
+    "| a | b |\n| c | d |",
+    "| a | b |\n| --- |",
+    "|キー=値\n|-\n|別のキー=値",
+    "a | b\n--- | ---",
+  ]) {
+    const { paragraphs } = parseMarkdownSections(source)[0];
+    assert.ok(paragraphs.every((paragraph) => paragraph.type !== "table"), source);
+  }
+});
+
+test("parseMarkdownSections does not parse Markdown tables inside code blocks", () => {
+  const { paragraphs } = parseMarkdownSections("<syntaxhighlight>\n| a | b |\n| - | - |\n</syntaxhighlight>")[0];
+  assert.deepEqual(paragraphs.map((paragraph) => paragraph.type), ["code-block"]);
+});
+
 test("parseMarkdownSections parses MediaWiki table with rowspan", () => {
   const sections = parseMarkdownSections(`{| class="wikitable"
 ! Col1
