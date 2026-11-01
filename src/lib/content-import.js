@@ -394,6 +394,27 @@ function parseCalloutLines(lines, startIndex) {
   };
 }
 
+// 素の引用 (> テキスト)。Obsidian の表示に合わせて行はそのまま改行し、空の > で段落を分ける
+function parsePlainQuoteLines(lines, startIndex) {
+  const bodyLines = [];
+  let endIndex = startIndex;
+
+  while (endIndex < lines.length && lines[endIndex].trim().startsWith(">")) {
+    bodyLines.push(lines[endIndex].trim().replace(/^>\s?/, ""));
+    endIndex += 1;
+  }
+
+  if (bodyLines.length === 0) {
+    return null;
+  }
+
+  return {
+    type: "blockquote",
+    body: bodyLines.join("<br>").replace(/^(?:<br>)+|(?:<br>)+$/g, ""),
+    endIndex,
+  };
+}
+
 function parseMediaWikiTable(lines, startIndex) {
   if (!/^\{\|/.test(lines[startIndex].trim())) {
     return null;
@@ -891,6 +912,16 @@ function buildParagraphs(lines) {
         body: callout.body,
       });
       lineIndex = callout.endIndex;
+      continue;
+    }
+
+    const plainQuote = parsePlainQuoteLines(lines, lineIndex);
+    if (plainQuote) {
+      flushParagraph();
+      if (plainQuote.body) {
+        paragraphs.push({ type: "blockquote", body: plainQuote.body });
+      }
+      lineIndex = plainQuote.endIndex;
       continue;
     }
 

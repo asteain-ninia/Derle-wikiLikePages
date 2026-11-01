@@ -395,6 +395,31 @@ test("renderInlineMarkdown preserves <br> tags", () => {
   assert.doesNotMatch(result, /&lt;br/);
 });
 
+test("renderArticlePage renders plain quote line breaks and emphasis", () => {
+  const rendered = renderArticlePage({
+    id: "q1",
+    title: "引用",
+    category: "記事",
+    created: "2026-03-20",
+    updated: "2026-03-23",
+    summary: "引用",
+    aliases: [],
+    tags: [],
+    unresolvedLinkCount: 0,
+    backlinks: [],
+    sections: [
+      {
+        heading: "概要",
+        anchorId: "section-概要",
+        paragraphs: [{ type: "blockquote", body: "*.we caow.*<br>「私は走る。」" }],
+      },
+    ],
+    templateModels: [],
+  });
+
+  assert.match(rendered, /<blockquote class="wiki-blockquote"><em>\.we caow\.<\/em><br>「私は走る。」<\/blockquote>/);
+});
+
 test("renderArticlePage renders table cell alignment", () => {
   const rendered = renderArticlePage({
     id: "t1",

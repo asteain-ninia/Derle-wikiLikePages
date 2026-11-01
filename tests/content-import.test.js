@@ -257,6 +257,47 @@ test("parseMarkdownSections parses MediaWiki tables ({| ... |})", () => {
   assert.equal(sections[0].paragraphs[2], "続き。");
 });
 
+test("parseMarkdownSections parses plain quotes and keeps their line breaks", () => {
+  const { paragraphs } = parseMarkdownSections(`前文。
+> 一行目
+> *.we caow.*
+>
+>二段落目
+後文。`)[0];
+
+  assert.equal(paragraphs[0], "前文。");
+  assert.deepEqual(paragraphs[1], {
+    type: "blockquote",
+    body: "一行目<br>*.we caow.*<br><br>二段落目",
+  });
+  assert.equal(paragraphs[2], "後文。");
+});
+
+test("parseMarkdownSections separates plain quotes split by a blank line and skips empty ones", () => {
+  const { paragraphs } = parseMarkdownSections("> 一\n\n> 二\n\n>\n>")[0];
+  assert.deepEqual(paragraphs, [
+    { type: "blockquote", body: "一" },
+    { type: "blockquote", body: "二" },
+  ]);
+});
+
+test("parseMarkdownSections still parses callouts before plain quotes", () => {
+  const [callout] = parseMarkdownSections("> [!note] 注意\n> 本文")[0].paragraphs;
+  assert.equal(callout.type, "callout");
+  assert.equal(callout.body, "本文");
+});
+
+test("buildArticleRecord collects wiki links inside plain quotes", () => {
+  const record = buildArticleRecord({
+    relativePath: "quote.md",
+    fileBasename: "quote",
+    sourceText: "本文。\n\n> [[引用先]]を参照",
+    created: "2026-01-01",
+    updated: "2026-01-01",
+  });
+  assert.ok(record.relatedTitles.includes("引用先"));
+});
+
 test("parseMarkdownSections parses Markdown tables with alignment", () => {
   const sections = parseMarkdownSections(`本文。
 | 語 | 品詞 | 意味 | 備考 |

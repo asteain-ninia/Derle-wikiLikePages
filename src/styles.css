@@ -763,7 +763,6 @@ html[data-file-protocol="true"] .protocol-warning {
   padding: 8px 16px;
   border-left: 3px solid var(--color-border);
   background: var(--color-surface-soft);
-  font-style: italic;
 }
 
 .wiki-blockquote p {
