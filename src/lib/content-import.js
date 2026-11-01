@@ -49,6 +49,8 @@ function stripInlineFormatting(text) {
   // 描画側 (renderInlineMarkdown) と同じく、単語内の _ は強調として扱わない
   return text
     .replace(/\[([^\]]+?)\]\(https?:\/\/[^)\s]+\)/g, "$1")
+    // MediaWiki の外部リンク [URL ラベル] はラベル、[URL] は URL だけを残す
+    .replace(/\[(https?:\/\/[^\s[\]<>"]+)(?:[ \t]+([^\]\n]+?))?[ \t]*\]/g, (_match, url, label) => label ?? url)
     .replace(/'''([^']+?)'''/g, "$1")
     .replace(/''([^']+?)''/g, "$1")
     .replace(/\*\*([^*]+?)\*\*/g, "$1")

@@ -876,6 +876,61 @@ test("renderInlineMarkdown still formats emphasis inside external link labels", 
   );
 });
 
+const EXTERNAL_LINK_OPEN = (url) => `<a href="${url}" class="external-link" rel="noopener noreferrer">`;
+
+test("renderInlineMarkdown converts MediaWiki [url label] to external link", () => {
+  assert.equal(
+    renderInlineMarkdown(escapeHtml("旧サイト[https://example.com/home 前文]を参照")),
+    `旧サイト${EXTERNAL_LINK_OPEN("https://example.com/home")}前文</a>を参照`
+  );
+});
+
+test("renderInlineMarkdown converts bare MediaWiki [url] to external link showing the url", () => {
+  const url = "https://docs.example.com/spreadsheets/d/1CfqcFD_wQIC/edit?gid=1&x=2#gid=1";
+  const escapedUrl = escapeHtml(url);
+  assert.equal(
+    renderInlineMarkdown(escapeHtml(`詳細情報：[${url}](The WorldSmith)`)),
+    `詳細情報：${EXTERNAL_LINK_OPEN(escapedUrl)}${escapedUrl}</a>(The WorldSmith)`
+  );
+});
+
+test("renderInlineMarkdown keeps emphasis markers inside MediaWiki external URLs literal", () => {
+  const rendered = renderInlineMarkdown(escapeHtml("[https://example.com/a_b_c/*x*y ''資料'']"));
+  assert.equal(rendered, `${EXTERNAL_LINK_OPEN("https://example.com/a_b_c/*x*y")}<em>資料</em></a>`);
+  assert.equal(
+    renderInlineMarkdown(escapeHtml("[https://example.com/a_b_c_]")),
+    `${EXTERNAL_LINK_OPEN("https://example.com/a_b_c_")}https://example.com/a_b_c_</a>`
+  );
+});
+
+test("renderInlineMarkdown only accepts http(s) for MediaWiki external links", () => {
+  for (const source of ["[javascript:alert(1) x]", "[ftp://example.com x]", "[data:text/html,x]", "[//example.com x]"]) {
+    const rendered = renderInlineMarkdown(escapeHtml(source));
+    assert.doesNotMatch(rendered, /<a /, source);
+  }
+});
+
+test("renderInlineMarkdown keeps quotes in MediaWiki external URLs from breaking the href", () => {
+  const rendered = renderInlineMarkdown(escapeHtml('[https://example.com/"onmouseover="alert(1) x]'));
+  assert.doesNotMatch(rendered, /"onmouseover/);
+  assert.doesNotMatch(rendered, /href="[^"]*"[^ >]/);
+  const raw = renderInlineMarkdown("[https://example.com/it's ok]");
+  assert.equal(raw, `${EXTERNAL_LINK_OPEN("https://example.com/it&#39;s")}ok</a>`);
+});
+
+test("renderInlineMarkdown does not treat placeholder delimiters or tags as part of MediaWiki external URLs", () => {
+  const tagged = '[https://example.com/<img src="x_y.png">]';
+  assert.equal(renderInlineMarkdown(tagged), tagged);
+  assert.equal(
+    renderInlineMarkdown("[https://example.com `a_b`] \uE020[https://example.com/a\uE021]"),
+    `${EXTERNAL_LINK_OPEN("https://example.com")}<code class="inline-code">a_b</code></a> ${EXTERNAL_LINK_OPEN("https://example.com/a")}https://example.com/a</a>`
+  );
+});
+
+test("renderInlineMarkdown leaves non-URL square brackets alone", () => {
+  assert.equal(renderInlineMarkdown(escapeHtml("[注] と [https://] と [ https://example.com ]")), "[注] と [https://] と [ https://example.com ]");
+});
+
 test("renderArticlePage renders ordered and nested mixed lists", () => {
   const item = (markers, value) => ({
     type: "list-item",

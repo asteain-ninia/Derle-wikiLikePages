@@ -48,6 +48,11 @@ function restorePlaceholders(text, heldParts) {
   return restored;
 }
 
+// 入力はエスケープ済みの前提だが、未エスケープの文字列が渡っても属性値から抜け出さないようにする
+function escapeAttributeQuotes(value) {
+  return value.replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
 export function renderInlineMarkdown(escapedText) {
   const heldParts = [];
   const hold = (html) => {
@@ -65,6 +70,17 @@ export function renderInlineMarkdown(escapedText) {
       /\[([^\]]+?)\]\((https?:\/\/[^)\s]+)\)/g,
       (_match, label, url) =>
         `${hold(`<a href="${url}" class="external-link" rel="noopener noreferrer">`)}${label}${hold("</a>")}`
+    )
+    // MediaWiki の外部リンク [URL ラベル] と [URL] (ラベルなしは URL をそのまま表示する)。
+    // URL は http/https だけで、空白・角括弧・引用符・タグの区切り・退避済みの断片を含まない
+    .replace(
+      /\[(https?:\/\/[^\s\[\]<>"\uE020\uE021]+)(?:[ \t]+([^\]\n]+?))?[ \t]*\]/g,
+      (_match, url, label) => {
+        const openTag = `<a href="${escapeAttributeQuotes(url)}" class="external-link" rel="noopener noreferrer">`;
+        return label
+          ? `${hold(openTag)}${label}${hold("</a>")}`
+          : hold(`${openTag}${url}</a>`);
+      }
     )
     .replace(/&lt;(https?:\/\/[^\s&]+?)&gt;/g, (_match, url) =>
       hold(`<a href="${url}" class="external-link" rel="noopener noreferrer">${url}</a>`)

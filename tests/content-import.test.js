@@ -584,6 +584,18 @@ test("buildArticleRecord summary keeps intraword underscores and drops link synt
   assert.equal(record.summary, "snake_case_name と 資料 と 強調");
 });
 
+test("buildArticleRecord summary drops MediaWiki external link brackets", () => {
+  const record = buildArticleRecord({
+    relativePath: "external.md",
+    fileBasename: "external",
+    sourceText: "旧サイト[https://example.com/home 前文]と[https://example.com/a?b=1]",
+    created: "2026-01-01",
+    updated: "2026-01-01",
+  });
+
+  assert.equal(record.summary, "旧サイト前文とhttps://example.com/a?b=1");
+});
+
 test("parseFrontmatter reads Japanese keys", () => {
   const { data } = parseFrontmatter("---\n種別: 国\n公開: false\n---\n本文");
   assert.equal(data["種別"], "国");
