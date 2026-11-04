@@ -11,6 +11,7 @@ import {
 import { loadTemplateHandlers } from "../src/lib/template-registry.js";
 import { buildBuildArtifacts } from "../src/lib/build-artifacts.js";
 import { readImageSize } from "../src/lib/image-size.js";
+import { summarizeArticleHistory } from "../src/lib/article-history.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -59,36 +60,8 @@ async function collectFiles(directoryPath) {
   return collected;
 }
 
-function getGitDates(repoRelativePath) {
-  try {
-    const output = execFileSync(
-      "git",
-      ["log", "--follow", "--format=%cs", "--", repoRelativePath],
-      {
-        cwd: projectRoot,
-        encoding: "utf8",
-        stdio: ["ignore", "pipe", "ignore"],
-      }
-    );
-    const dates = output
-      .split(/\r?\n/)
-      .map((value) => value.trim())
-      .filter(Boolean);
-
-    if (dates.length > 0) {
-      return {
-        created: dates[dates.length - 1],
-        updated: dates[0],
-      };
-    }
-  } catch {
-    return null;
-  }
-
-  return null;
-}
-
-function getGitHistory(repoRelativePath) {
+// 原稿ファイルに触れたコミット (新しい順)
+function getGitCommits(repoRelativePath) {
   try {
     const output = execFileSync(
       "git",
@@ -112,16 +85,19 @@ function getGitHistory(repoRelativePath) {
   }
 }
 
-async function getFileDates(absolutePath, repoRelativePath) {
-  const gitDates = getGitDates(repoRelativePath);
-  if (gitDates) {
-    return gitDates;
+// 作成日・更新日・更新履歴。履歴に載るのは wiki: のコミットと保管庫時代のコミットだけ (src/lib/article-history.js)。
+// まだコミットされていない原稿はファイルの日付を使う
+async function getFileHistory(absolutePath, repoRelativePath) {
+  const summary = summarizeArticleHistory(getGitCommits(repoRelativePath));
+  if (summary) {
+    return summary;
   }
 
   const fileStats = await stat(absolutePath);
   return {
     created: formatDate(fileStats.birthtimeMs || fileStats.ctimeMs || fileStats.mtimeMs),
     updated: formatDate(fileStats.mtimeMs),
+    history: [],
   };
 }
 
@@ -177,15 +153,14 @@ async function buildContentData() {
       continue;
     }
 
-    const dates = await getFileDates(absolutePath, repoRelativePath);
-    const history = getGitHistory(repoRelativePath);
+    const { created, updated, history } = await getFileHistory(absolutePath, repoRelativePath);
 
     const record = buildArticleRecord({
       relativePath: relativeToContent,
       fileBasename,
       sourceText,
-      created: dates.created,
-      updated: dates.updated,
+      created,
+      updated,
       templateHandlers,
       resolveAssetPath,
     });
