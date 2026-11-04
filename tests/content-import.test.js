@@ -766,3 +766,34 @@ test("parseMarkdownSections は見出しの深さを level に残す", () => {
     [["概要", 2], ["歴史", 2], ["起源", 3], ["東進", 3]]
   );
 });
+
+test("parseMarkdownSections は見出しの原文 (sourceHeading) から HTML タグを本文と同じ基準で取り除く", () => {
+  const sections = parseMarkdownSections(
+    [
+      "冒頭。",
+      "",
+      '== <span style="color:red">赤</span>見出し ==',
+      "本文。",
+      "",
+      "## <script>alert(1)</script>警告",
+      "本文。",
+      "",
+      "## <small>注</small>と[[記事]]と'''太字'''",
+      "本文。",
+      "",
+      "== <span></span> ==",
+      "本文。",
+    ].join("\n")
+  );
+  assert.deepEqual(
+    sections.slice(1).map((section) => [section.sourceHeading, section.heading]),
+    [
+      ["赤見出し", "赤見出し"],
+      ["alert(1)警告", "alert(1)警告"],
+      // small / sup / sub / br は本文と同じく残す。リンクと書式は原文のまま (描画で解釈する)
+      ["<small>注</small>と[[記事]]と'''太字'''", "注と記事と太字"],
+      // 取り除くと空になる見出しは、平文の見出しが「節」になる (main と同じ)
+      ["", "節"],
+    ]
+  );
+});

@@ -607,6 +607,53 @@ test("buildArticlePageModel は見出しの中の [[リンク]] を headingSegme
   assert.equal(pageModel.unresolvedLinkCount, 1);
 });
 
+test("buildArticlePageModel の見出しのリンクは表示文字を書かれたまま (目次と同じ) にし、画像の埋め込みは文字のままにする", () => {
+  const world = {
+    id: "world",
+    title: "出界",
+    sections: [
+      { heading: "概要", sourceHeading: "", paragraphs: [] },
+      { heading: "記事B", sourceHeading: "[[記事B#節1]]", level: 3, paragraphs: [] },
+      { heading: "別名B", sourceHeading: "[[別名B]]", level: 3, paragraphs: [] },
+      { heading: "表示名", sourceHeading: "[[記事B|表示名]]", level: 3, paragraphs: [] },
+      { heading: "!画像.png の図", sourceHeading: "![[画像.png]] の図", level: 3, paragraphs: [] },
+      // タグを取り除くと空になる見出し (== <span></span> ==) は平文の「節」で描画する
+      { heading: "節", sourceHeading: "", level: 3, paragraphs: [] },
+    ],
+  };
+  const articleB = {
+    id: "b",
+    title: "記事B",
+    aliases: ["別名B"],
+    sections: [{ heading: "節1", paragraphs: [] }],
+  };
+  const graph = buildWikiGraph([world, articleB]);
+
+  const [, byHeading, byAlias, byDisplay, withEmbed, emptied] = buildArticlePageModel(graph, "world").sections;
+  // 本文なら「記事B#節1」と表示するところを、見出しでは目次と同じ「記事B」にする (行き先は節1のまま)
+  assert.deepEqual(byHeading.headingSegments, [
+    { type: "link", status: "resolved", href: buildArticleHref("b", "節1"), label: "記事B", title: "記事B" },
+  ]);
+  // 別名で書いた見出しは、正式な題名に置き換えず書いたまま
+  assert.deepEqual(byAlias.headingSegments, [
+    { type: "link", status: "resolved", href: buildArticleHref("b"), label: "別名B", title: "記事B" },
+  ]);
+  assert.deepEqual(byDisplay.headingSegments, [
+    { type: "link", status: "resolved", href: buildArticleHref("b"), label: "表示名", title: "記事B" },
+  ]);
+  assert.deepEqual(withEmbed.headingSegments, [
+    { type: "text", value: "!画像.png" },
+    { type: "text", value: " の図" },
+  ]);
+  assert.deepEqual(emptied.headingSegments, [{ type: "text", value: "節" }]);
+  // 本文の segments はこれまでどおり (asWritten を付けない)
+  assert.deepEqual(buildWikiTextSegments("[[記事B#節1]]と![[画像.png]]", graph, world), [
+    { type: "link", status: "resolved", href: buildArticleHref("b", "節1"), label: "記事B#節1", title: "記事B" },
+    { type: "text", value: "と" },
+    { type: "embed", src: "画像.png", alt: "画像.png" },
+  ]);
+});
+
 test("parseAppRoute は #!maintenance を保守レポートのページにする", () => {
   assert.deepEqual(parseAppRoute("#!maintenance"), { view: "maintenance" });
 });

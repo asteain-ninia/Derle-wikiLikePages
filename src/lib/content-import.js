@@ -1066,7 +1066,8 @@ export function parseMarkdownSections(sourceText) {
     }
 
     sections.push({
-      sourceHeading: currentSection.rawHeading,
+      // 見出しの原文 ([[リンク]] や書式を残す)。HTML タグは本文の段落と同じ基準で取り除く
+      sourceHeading: normalizeSectionText(currentSection.rawHeading),
       heading: currentSection.heading,
       // 見出しの深さ (## / == == が 2、### / === === が 3 …)。目次の入れ子と見出しの大きさに使う
       level: currentSection.level,

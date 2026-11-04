@@ -489,8 +489,10 @@ export function matchSectionHeading(entry, heading) {
   return headings.find((candidate) => candidate.startsWith(heading)) ?? heading;
 }
 
-// currentEntry は本文を描画している記事。[[#見出し]] (同じ記事内の見出しへのリンク) の行き先に使う
-export function buildWikiTextSegments(text, graph, currentEntry = null) {
+// currentEntry は本文を描画している記事。[[#見出し]] (同じ記事内の見出しへのリンク) の行き先に使う。
+// asWritten は見出し用: リンクの表示文字を書かれたまま (目次の平文と同じ) にし、[[記事#節]] や別名でも
+// 正式な題名に置き換えない。![[画像]] も画像にせず、平文と同じ文字のまま残す
+export function buildWikiTextSegments(text, graph, currentEntry = null, { asWritten = false } = {}) {
   const links = extractWikiLinks(text);
 
   if (links.length === 0) {
@@ -509,11 +511,15 @@ export function buildWikiTextSegments(text, graph, currentEntry = null) {
     }
 
     if (link.isEmbed) {
-      segments.push({
-        type: "embed",
-        src: link.pageTitle,
-        alt: link.displayText || link.pageTitle.split("/").pop(),
-      });
+      segments.push(
+        asWritten
+          ? { type: "text", value: `!${link.displayText || link.pageTitle}` }
+          : {
+              type: "embed",
+              src: link.pageTitle,
+              alt: link.displayText || link.pageTitle.split("/").pop(),
+            }
+      );
       cursor = link.end;
       continue;
     }
@@ -536,13 +542,14 @@ export function buildWikiTextSegments(text, graph, currentEntry = null) {
     }
 
     const resolution = resolveArticleReference(graph.referenceIndex, graph.entryById, link.pageTitle);
+    const writtenLabel = asWritten ? link.displayText || link.pageTitle : "";
 
     if (resolution.type === "article") {
       segments.push({
         type: "link",
         status: "resolved",
         href: buildArticleHref(resolution.entry.id, matchSectionHeading(resolution.entry, link.heading)),
-        label: buildReferenceLabel(link, resolution.entry.title),
+        label: writtenLabel || buildReferenceLabel(link, resolution.entry.title),
         title: resolution.entry.title,
       });
     } else if (resolution.type === "ambiguous") {
@@ -550,7 +557,7 @@ export function buildWikiTextSegments(text, graph, currentEntry = null) {
         type: "link",
         status: "ambiguous",
         href: buildDisambiguationHref(link.pageTitle),
-        label: buildReferenceLabel(link, link.pageTitle),
+        label: writtenLabel || buildReferenceLabel(link, link.pageTitle),
         title: link.pageTitle,
       });
     } else {
@@ -558,7 +565,7 @@ export function buildWikiTextSegments(text, graph, currentEntry = null) {
         type: "link",
         status: "missing",
         href: buildMissingPageHref(link.pageTitle),
-        label: buildReferenceLabel(link, link.pageTitle),
+        label: writtenLabel || buildReferenceLabel(link, link.pageTitle),
         title: link.pageTitle,
       });
     }
@@ -652,8 +659,12 @@ export function buildArticlePageModel(graph, entryId) {
       return segments;
     });
 
-    // 見出しの中の [[リンク]] も本文と同じくリンクにする。目次と移動先の id は平文の heading のまま
-    const headingSegments = buildWikiTextSegments(section.sourceHeading || section.heading, graph, entry);
+    // 見出しの中の [[リンク]] も本文と同じくリンクにする。目次と移動先の id は平文の heading のまま。
+    // 表示文字は書かれたまま (目次と同じ) にし、画像の埋め込みは画像にしない (asWritten)。
+    // タグを取り除くと空になる見出し (sourceHeading が "") は平文の heading (「節」) を使う
+    const headingSegments = buildWikiTextSegments(section.sourceHeading || section.heading, graph, entry, {
+      asWritten: true,
+    });
     unresolvedLinkCount += headingSegments.filter(
       (segment) => segment.type === "link" && segment.status !== "resolved"
     ).length;
