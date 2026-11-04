@@ -487,9 +487,31 @@ html[data-file-protocol="true"] .protocol-warning {
 
 .toc__list {
   margin: 0;
-  padding-left: 1.6em;
+  padding-left: 0;
   font-size: 0.9rem;
   line-height: 1.8;
+}
+
+/* 入れ子の目次に 1 / 1.1 / 1.1.1 と番号を振る (Wikipedia と同じ) */
+.toc__list,
+.toc__list ol {
+  list-style: none;
+  counter-reset: toc-item;
+}
+
+.toc__list ol {
+  margin: 0;
+  padding-left: 1.4em;
+}
+
+.toc__list li {
+  counter-increment: toc-item;
+}
+
+.toc__list li::before {
+  content: counters(toc-item, ".") " ";
+  color: var(--color-text-muted);
+  margin-right: 0.3em;
 }
 
 .toc__list a {
@@ -564,6 +586,28 @@ html[data-file-protocol="true"] .protocol-warning {
   font-family: "asteain", Georgia, "Times New Roman", "Yu Mincho", serif;
   font-size: 1.18rem;
   font-weight: 400;
+}
+
+/* ### 以下の小見出し。区切り線は ## の節だけに引く */
+.article-section + .article-section--sub {
+  padding-top: 4px;
+  border-top: none;
+}
+
+.article-section h4.article-section__heading,
+.article-section h5.article-section__heading,
+.article-section h6.article-section__heading {
+  margin: 0 0 8px;
+  font-weight: 700;
+}
+
+.article-section h4.article-section__heading {
+  font-size: 1.02rem;
+}
+
+.article-section h5.article-section__heading,
+.article-section h6.article-section__heading {
+  font-size: 0.95rem;
 }
 
 .article-section p {
@@ -909,4 +953,10 @@ html[data-file-protocol="true"] .protocol-warning {
 
 .site-maintenance-link a {
   color: var(--color-text-muted);
+}
+
+/* インフォボックスの画像は枠の幅に収める (width / height 属性は縦横比のためだけに使う) */
+.infobox__image img {
+  max-width: 100%;
+  height: auto;
 }

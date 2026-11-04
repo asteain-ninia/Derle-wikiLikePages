@@ -1,4 +1,4 @@
-import { contentBuildInfo, generatedArticles } from "./generated/content-data.js";
+import { contentBuildInfo, generatedArticles, imageSizes } from "./generated/content-data.js";
 
 export const articles = generatedArticles;
-export { contentBuildInfo };
+export { contentBuildInfo, imageSizes };

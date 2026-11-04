@@ -35,3 +35,6 @@
 - リスト項目は `{ type: "list-item", markers, body }` (markers は MediaWiki 式の `*` / `#` / `#*` …)。描画は `renderers.js` の `renderList`
 - `renderInlineMarkdown` は生成済みタグ・コード・URL をプレースホルダ (U+E020/U+E021) に退避してから強調記法を処理する。nowiki のセンチネルは U+E010〜U+E017
 - `build:content` は記事データと一緒にリンクの解決結果 (`backlinks.json` など) と保守レポート (`src/data/generated/maintenance-report.md`: 孤立・行き止まり・未解決リンク・リンク密度) を書き出す。組み立ては `src/lib/build-artifacts.js` で、リンク解決は `buildWikiGraph` を使う。サイト内では `#!maintenance` (メインページ下の小さなリンク) が `maintenance-report.json` を読んで記事と同じ見た目で表示する
+- サイト名は「出界百科」(`index.html` と `src/main.js` の `SITE_NAME`)
+- 節は見出しの深さ `level` を持つ (## = 2)。目次は深さで入れ子にし、本文の見出しは ## を h3、### 以下を h4〜h6 にする
+- 画像は `build:content` が縦横を調べて `imageSizes` (content-data.js) に入れ、img に width / height を付ける。遅延読み込みの画像が後から伸びて見出しへの移動位置がずれるのを防ぐため

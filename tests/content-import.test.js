@@ -758,3 +758,11 @@ test("checkPublication accepts only an exact true value", () => {
     assert.equal(published(value), false, value);
   }
 });
+
+test("parseMarkdownSections は見出しの深さを level に残す", () => {
+  const sections = parseMarkdownSections("冒頭。\n\n## 歴史\n本文。\n\n### 起源\n本文。\n\n=== 東進 ===\n本文。\n");
+  assert.deepEqual(
+    sections.map((section) => [section.heading, section.level]),
+    [["概要", 2], ["歴史", 2], ["起源", 3], ["東進", 3]]
+  );
+});

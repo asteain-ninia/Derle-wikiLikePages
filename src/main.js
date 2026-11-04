@@ -1,4 +1,4 @@
-import { articles } from "./data/articles.js";
+import { articles, imageSizes } from "./data/articles.js";
 import { siteConfig } from "./data/site-config.js";
 import {
   buildHomePageModel,
@@ -28,7 +28,12 @@ import {
   renderSearchResults,
   renderSummaryList,
   renderUpdateList,
+  setImageSizes,
 } from "./lib/renderers.js";
+
+const SITE_NAME = "出界百科";
+
+setImageSizes(imageSizes);
 
 const homePageModel = buildHomePageModel({ articles, siteConfig });
 const wikiGraph = buildWikiGraph(articles);
@@ -37,8 +42,6 @@ const elements = {
   pageHeading: document.getElementById("page-heading"),
   pageLead: document.getElementById("page-lead"),
   welcomeSummary: document.getElementById("welcome-summary"),
-  featuredStatus: document.getElementById("featured-status"),
-  previewStatus: document.getElementById("preview-status"),
   featuredArticle: document.getElementById("featured-article"),
   newArticles: document.getElementById("new-articles"),
   recentUpdates: document.getElementById("recent-updates"),
@@ -67,12 +70,10 @@ function renderWelcomeSummary() {
 
 function renderFeaturedState() {
   elements.featuredArticle.innerHTML = renderFeaturedArticle(state.featuredEntry);
-  elements.featuredStatus.textContent = `選り抜き記事として「${state.featuredEntry.title}」を表示しています。`;
 }
 
 function renderPreviewState() {
   elements.previewArticle.innerHTML = renderPreviewArticle(state.previewEntry);
-  elements.previewStatus.textContent = `記事プレビューとして「${state.previewEntry.title}」を表示しています。`;
 }
 
 function renderStaticSections() {
@@ -126,42 +127,42 @@ function updatePageHeader(route) {
     if (pageModel) {
       elements.pageHeading.textContent = pageModel.title;
       elements.pageLead.textContent = pageModel.summary || `${pageModel.category}の記事です。`;
-      document.title = `${pageModel.title} - WikiLikePages`;
+      document.title = `${pageModel.title} - ${SITE_NAME}`;
       return;
     }
   }
 
   if (route.view === "missing") {
     elements.pageHeading.textContent = `${route.title} (未作成)`;
-    elements.pageLead.textContent = "未作成記事の案内ページです。参照元と近い既存ページを確認できます。";
-    document.title = `${route.title} - 未作成記事 - WikiLikePages`;
+    elements.pageLead.textContent = "まだ記事になっていない項目です。";
+    document.title = `${route.title} - 未作成記事 - ${SITE_NAME}`;
     return;
   }
 
   if (route.view === "disambiguation") {
     elements.pageHeading.textContent = `${route.title} (曖昧な名称)`;
-    elements.pageLead.textContent = "複数候補に分岐する名称の案内ページです。";
-    document.title = `${route.title} - 曖昧な名称 - WikiLikePages`;
+    elements.pageLead.textContent = "複数の記事にあてはまる名前です。";
+    document.title = `${route.title} - 曖昧な名称 - ${SITE_NAME}`;
     return;
   }
 
   if (route.view === "category") {
     elements.pageHeading.textContent = route.category;
     elements.pageLead.textContent = `「${route.category}」カテゴリの記事一覧です。`;
-    document.title = `${route.category} - カテゴリ - WikiLikePages`;
+    document.title = `${route.category} - カテゴリ - ${SITE_NAME}`;
     return;
   }
 
   if (route.view === "maintenance") {
     elements.pageHeading.textContent = "保守レポート";
     elements.pageLead.textContent = "記事どうしのリンクのつながりをまとめたものです。";
-    document.title = `保守レポート - WikiLikePages`;
+    document.title = `保守レポート - ${SITE_NAME}`;
     return;
   }
 
   elements.pageHeading.textContent = "メインページ";
-  elements.pageLead.textContent = "架空世界の知識を集め、つなげる百科事典です。";
-  document.title = "WikiLikePages";
+  elements.pageLead.textContent = "架空世界「出界」の百科事典です。";
+  document.title = SITE_NAME;
 }
 
 function handleRandomButtonClick() {
@@ -174,19 +175,51 @@ function handleRandomButtonClick() {
   }
 }
 
+let stopFollowingScrollTarget = () => {};
+
+// 節へ移動する。移動のあとで上にある画像が読み込まれると節が下へずれるので、
+// 画像が読み込まれるたびに合わせ直す。読者が自分でスクロールしたら (または 5 秒たったら) やめる
+function scrollToElement(target) {
+  stopFollowingScrollTarget();
+  const align = () => target.scrollIntoView({ block: "start" });
+  align();
+
+  const pendingImages = [...elements.detailView.querySelectorAll("img")].filter((image) => !image.complete);
+  if (pendingImages.length === 0) {
+    return;
+  }
+
+  const userEvents = ["wheel", "touchstart", "keydown", "mousedown"];
+  const timer = setTimeout(() => stopFollowingScrollTarget(), 5000);
+  stopFollowingScrollTarget = () => {
+    clearTimeout(timer);
+    for (const image of pendingImages) {
+      image.removeEventListener("load", align);
+    }
+    for (const type of userEvents) {
+      window.removeEventListener(type, stopFollowingScrollTarget);
+    }
+    stopFollowingScrollTarget = () => {};
+  };
+  for (const image of pendingImages) {
+    image.addEventListener("load", align);
+  }
+  for (const type of userEvents) {
+    window.addEventListener(type, stopFollowingScrollTarget, { passive: true });
+  }
+}
+
 function scrollToArticleSection(sectionHeading) {
-  if (!sectionHeading) {
-    window.scrollTo({ top: 0, behavior: "smooth" });
-    return;
-  }
-
-  const sectionAnchor = document.getElementById(buildSectionAnchorId(sectionHeading));
+  const sectionAnchor = sectionHeading
+    ? document.getElementById(buildSectionAnchorId(sectionHeading))
+    : null;
   if (sectionAnchor) {
-    sectionAnchor.scrollIntoView({ block: "start", behavior: "smooth" });
+    scrollToElement(sectionAnchor);
     return;
   }
 
-  window.scrollTo({ top: 0, behavior: "smooth" });
+  stopFollowingScrollTarget();
+  window.scrollTo({ top: 0 });
 }
 
 function renderDetailView(route) {
@@ -263,6 +296,14 @@ function renderRoute() {
   }
 }
 
+function isCurrentHash(href) {
+  try {
+    return decodeURIComponent(href) === decodeURIComponent(window.location.hash);
+  } catch {
+    return href === window.location.hash;
+  }
+}
+
 function bindEvents() {
   elements.searchForm.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -277,6 +318,15 @@ function bindEvents() {
   window.addEventListener("hashchange", renderRoute);
 
   elements.detailView.addEventListener("click", (event) => {
+    // いま開いている節へのリンクをもう一度押しても URL が変わらず hashchange が起きないので、
+    // 自分で節へ移動し直す (Wikipedia で同じ見出しリンクを何度押しても飛ぶのと同じにする)
+    const articleLink = event.target.closest('a[href^="#!article/"]');
+    if (articleLink && isCurrentHash(articleLink.getAttribute("href"))) {
+      event.preventDefault();
+      scrollToArticleSection(state.route.sectionHeading);
+      return;
+    }
+
     const tocLink = event.target.closest(".toc__list a");
     if (!tocLink) {
       return;
@@ -287,7 +337,7 @@ function bindEvents() {
     if (targetId) {
       const target = document.getElementById(targetId);
       if (target) {
-        target.scrollIntoView({ block: "start", behavior: "smooth" });
+        scrollToElement(target);
       }
     }
   });

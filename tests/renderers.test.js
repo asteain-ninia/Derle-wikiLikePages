@@ -123,9 +123,10 @@ test("renderMissingPage shows source entries and guidance", () => {
     suggestions: [{ id: "entry-2", title: "潮見港", category: "世界設定", updated: "2026-03-14" }],
   });
 
-  assert.match(rendered, /参照元ページ/);
+  assert.match(rendered, /この名前にリンクしている記事/);
   assert.match(rendered, /近い既存ページ/);
-  assert.match(rendered, /白磁航路台帳.wiki/);
+  // 読者向けのページなので、原稿の置き方などの作業手順は出さない
+  assert.doesNotMatch(rendered, /build:content|\.wiki/);
 });
 
 test("renderDisambiguationPage lists candidate pages", () => {
@@ -1067,6 +1068,41 @@ test("renderArticlePage wraps skipped list levels in an item instead of nesting 
     list,
     "<ul><li><ul><li>子</li></ul></li><li>親<ul><li><ul><li>孫</li></ul></li></ul></li><li>次</li></ul>"
   );
+});
+
+test("renderArticlePage は見出しの深さで目次を入れ子にし、### 以下を小見出しにする", () => {
+  const section = (heading, level) => ({ heading, level, anchorId: `section-${heading}`, paragraphs: [] });
+  const rendered = renderArticlePage({
+    id: "religion",
+    title: "デーレ教",
+    category: "宗教",
+    created: "2026-03-10",
+    updated: "2026-03-15",
+    summary: "",
+    aliases: [],
+    tags: [],
+    unresolvedLinkCount: 0,
+    backlinks: [],
+    sections: [
+      section("概要", 2),
+      section("歴史", 2),
+      section("起源", 3),
+      section("細部", 4),
+      section("教義", 2),
+    ],
+    templateModels: [],
+    footnotes: [],
+    history: [],
+  });
+
+  const toc = rendered.match(/<ol class="toc__list">(.*?)<\/ol>\s*<\/nav>/s)[1];
+  assert.equal(
+    toc,
+    '<li><a href="#section-歴史">歴史</a><ol><li><a href="#section-起源">起源</a><ol><li><a href="#section-細部">細部</a></li></ol></li></ol></li><li><a href="#section-教義">教義</a></li>'
+  );
+  assert.match(rendered, /<h3 class="article-section__heading">歴史<\/h3>/);
+  assert.match(rendered, /article-section--sub" id="section-起源">\s*<h4 class="article-section__heading">起源<\/h4>/);
+  assert.match(rendered, /<h5 class="article-section__heading">細部<\/h5>/);
 });
 
 test("renderMaintenanceReportPage は保守レポートを記事と同じ見た目のページにし、記事や未作成の名前へリンクする", () => {

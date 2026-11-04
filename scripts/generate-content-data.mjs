@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
+import { mkdir, open, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -10,6 +10,7 @@ import {
 } from "../src/lib/content-import.js";
 import { loadTemplateHandlers } from "../src/lib/template-registry.js";
 import { buildBuildArtifacts } from "../src/lib/build-artifacts.js";
+import { readImageSize } from "../src/lib/image-size.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -155,6 +156,16 @@ async function buildContentData() {
   const resolveAssetPath = (fileName) =>
     fileName.includes("/") ? fileName : assetPathsByName.get(fileName) ?? fileName;
 
+  // 画像の縦横 (content/ からのパス → [幅, 高さ])。img に width / height を付け、
+  // 遅延読み込みの画像が後から伸びてページの位置がずれないようにする
+  const imageSizes = {};
+  for (const filePath of allFiles.filter((candidate) => IMAGE_FILE_EXTENSIONS.test(candidate))) {
+    const size = await readImageFileSize(filePath);
+    if (size) {
+      imageSizes[toPosixPath(path.relative(contentRoot, filePath))] = [size.width, size.height];
+    }
+  }
+
   for (const absolutePath of markdownFiles) {
     const relativeToContent = toPosixPath(path.relative(contentRoot, absolutePath));
     const repoRelativePath = toPosixPath(path.relative(projectRoot, absolutePath));
@@ -202,11 +213,28 @@ async function buildContentData() {
       generatedAt: new Date().toISOString(),
     },
     generatedArticles: sortEntries(publishedEntries),
+    imageSizes,
   };
 }
 
-function serializeModule({ contentBuildInfo, generatedArticles }) {
-  return `export const contentBuildInfo = ${JSON.stringify(contentBuildInfo, null, 2)};\n\nexport const generatedArticles = ${JSON.stringify(generatedArticles, null, 2)};\n`;
+// 大きさは先頭に書かれているので、まず先頭だけ読む (JPEG で見つからなければ全体を読む)
+async function readImageFileSize(filePath) {
+  const handle = await open(filePath, "r");
+  try {
+    const head = Buffer.alloc(256 * 1024);
+    const { bytesRead } = await handle.read(head, 0, head.length, 0);
+    const size = readImageSize(head.subarray(0, bytesRead));
+    if (size || bytesRead < head.length) {
+      return size;
+    }
+  } finally {
+    await handle.close();
+  }
+  return readImageSize(await readFile(filePath));
+}
+
+function serializeModule({ contentBuildInfo, generatedArticles, imageSizes }) {
+  return `export const contentBuildInfo = ${JSON.stringify(contentBuildInfo, null, 2)};\n\nexport const generatedArticles = ${JSON.stringify(generatedArticles, null, 2)};\n\nexport const imageSizes = ${JSON.stringify(imageSizes, null, 2)};\n`;
 }
 
 const contentData = await buildContentData();

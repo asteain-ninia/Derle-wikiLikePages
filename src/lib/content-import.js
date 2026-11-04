@@ -1056,6 +1056,7 @@ export function parseMarkdownSections(sourceText) {
   let currentSection = {
     rawHeading: "",
     heading: "概要",
+    level: 2,
     paragraphs: [],
   };
 
@@ -1067,6 +1068,8 @@ export function parseMarkdownSections(sourceText) {
     sections.push({
       sourceHeading: currentSection.rawHeading,
       heading: currentSection.heading,
+      // 見出しの深さ (## / == == が 2、### / === === が 3 …)。目次の入れ子と見出しの大きさに使う
+      level: currentSection.level,
       paragraphs: currentSection.paragraphs,
     });
   }
@@ -1087,6 +1090,7 @@ export function parseMarkdownSections(sourceText) {
       currentSection = {
         rawHeading: token.text,
         heading: normalizeHeadingText(token.text) || "節",
+        level: token.level ?? 2,
         paragraphs: [],
       };
     }

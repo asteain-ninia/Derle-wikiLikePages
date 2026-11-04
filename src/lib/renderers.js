@@ -29,6 +29,21 @@ function buildAssetUrl(contentRelativePath) {
   return `content/${contentRelativePath.split("/").map(encodeURIComponent).join("/")}`;
 }
 
+// build:content が調べた画像の縦横 (content/ からのパス → [幅, 高さ])。main.js が setImageSizes で渡す
+let knownImageSizes = {};
+
+export function setImageSizes(sizes) {
+  knownImageSizes = sizes ?? {};
+}
+
+// 遅延読み込みの画像でも読み込み前から場所を空けておけるよう、分かっていれば width / height を付ける
+function renderImageTag(contentRelativePath, alt, className = "") {
+  const size = knownImageSizes[contentRelativePath];
+  const classAttr = className ? ` class="${escapeHtml(className)}"` : "";
+  const sizeAttrs = size ? ` width="${size[0]}" height="${size[1]}"` : "";
+  return `<img${classAttr} src="${escapeHtml(buildAssetUrl(contentRelativePath))}" alt="${escapeHtml(alt)}"${sizeAttrs} loading="lazy">`;
+}
+
 function renderEntryLink(entry, options = {}) {
   const href = options.heading
     ? buildArticleHref(entry.id, options.heading)
@@ -123,7 +138,7 @@ function renderParagraphSegments(segments) {
       }
 
       if (segment.type === "embed") {
-        return `<img class="embed-image" src="${escapeHtml(buildAssetUrl(segment.src))}" alt="${escapeHtml(segment.alt)}" loading="lazy">`;
+        return renderImageTag(segment.src, segment.alt, "embed-image");
       }
 
       const classNames = ["wiki-link"];
@@ -405,12 +420,27 @@ function renderTableOfContents(sections) {
     return "";
   }
 
-  const items = headings
-    .map(
-      (section) =>
-        `<li><a href="#${escapeHtml(section.anchorId)}">${escapeHtml(section.heading)}</a></li>`
-    )
-    .join("");
+  // 見出しの深さで入れ子にする (Wikipedia の目次と同じく 1 / 1.1 / 1.1.1 と番号を振る)
+  const root = { level: -Infinity, children: [] };
+  const stack = [root];
+  for (const section of headings) {
+    const level = section.level ?? 2;
+    while (stack.length > 1 && stack[stack.length - 1].level >= level) {
+      stack.pop();
+    }
+    const node = { section, level, children: [] };
+    stack[stack.length - 1].children.push(node);
+    stack.push(node);
+  }
+
+  const renderItems = (nodes) =>
+    nodes
+      .map(({ section, children }) => {
+        const childList = children.length > 0 ? `<ol>${renderItems(children)}</ol>` : "";
+        return `<li><a href="#${escapeHtml(section.anchorId)}">${escapeHtml(section.heading)}</a>${childList}</li>`;
+      })
+      .join("");
+  const items = renderItems(root.children);
 
   return `
     <nav class="toc" aria-labelledby="toc-heading">
@@ -513,7 +543,7 @@ export function renderSearchResults(query, matches) {
   if (matches.length === 0) {
     return `
       <h2>検索結果</h2>
-      <p>「${safeQuery}」に一致するサンプル記事はありません。</p>
+      <p>「${safeQuery}」に一致する記事はありません。</p>
     `;
   }
 
@@ -639,9 +669,13 @@ export function renderArticlePage(pageModel) {
         <div class="article-page__body">
           ${pageModel.sections
             .map((section) => {
+              // ## (深さ 2) を h3 にし、### 以下は h4〜h6。記事名が h2 なので 1 段ずらす
+              const level = Math.min(Math.max(section.level ?? 2, 2), 5);
+              const tag = `h${level + 1}`;
+              const subClass = level > 2 ? " article-section--sub" : "";
               return `
-                <section class="article-section" id="${escapeHtml(section.anchorId)}">
-                  <h3>${escapeHtml(section.heading)}</h3>
+                <section class="article-section${subClass}" id="${escapeHtml(section.anchorId)}">
+                  <${tag} class="article-section__heading">${escapeHtml(section.heading)}</${tag}>
                   ${renderSectionParagraphs(section.paragraphs)}
                 </section>
               `;
@@ -706,23 +740,15 @@ export function renderMissingPage(pageModel) {
         <p class="article-page__eyebrow">未作成記事</p>
         <h2>${escapeHtml(pageModel.title)}</h2>
         <p class="article-page__summary">
-          この項目はまだ記事として作成されていません。参照元と近い既存ページを確認し、必要なら原稿化してください。
+          この項目はまだ記事になっていません。
         </p>
       </header>
 
       <div class="article-page__layout">
         <div class="article-page__body">
           <section class="article-section">
-            <h3>参照元ページ</h3>
+            <h3>この名前にリンクしている記事</h3>
             ${renderEntrySummaryLinks(pageModel.sourceEntries)}
-          </section>
-
-          <section class="article-section">
-            <h3>記事を作成する</h3>
-            <p>
-              <code>content/</code> 配下に原稿ファイル（例: <code>${escapeHtml(pageModel.title)}.wiki</code>）を置き、
-              <code>npm run build:content</code> を実行するとこのページが記事になります。
-            </p>
           </section>
         </div>
 
@@ -802,7 +828,7 @@ export function renderNotFoundPage(label) {
         <p class="article-page__eyebrow">ページ未検出</p>
         <h2>${escapeHtml(label)}</h2>
         <p class="article-page__summary">
-          指定されたページは現在のサンプルデータに存在しません。メインページから辿り直してください。
+          この名前の記事はありません。
         </p>
       </header>
     </article>
@@ -819,7 +845,7 @@ export function renderInfobox(model) {
       (image) => `
         <tr>
           <td class="infobox__image" colspan="2">
-            <img src="${escapeHtml(buildAssetUrl(image.src))}" alt="${escapeHtml(image.caption || image.src)}" loading="lazy">
+            ${renderImageTag(image.src, image.caption || image.src)}
             ${image.caption ? `<div class="infobox__caption">${escapeHtml(image.caption)}</div>` : ""}
           </td>
         </tr>

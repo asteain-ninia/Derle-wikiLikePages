@@ -201,7 +201,7 @@ if (vaultPath && existsSync(vaultPath)) {
 rebuildContent();
 
 server.listen(port, host, () => {
-  console.log(`WikiLikePages dev server: http://localhost:${port}`);
+  console.log(`出界百科 dev server: http://localhost:${port}`);
   console.log(
     vaultPath && existsSync(vaultPath)
       ? `保管庫 (${vaultPath}) を監視しています。保存すると同期・ビルドしてブラウザを再読み込みします。`
