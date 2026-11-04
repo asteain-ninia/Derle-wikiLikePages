@@ -161,7 +161,7 @@ function updatePageHeader(route) {
   }
 
   elements.pageHeading.textContent = "メインページ";
-  elements.pageLead.textContent = "架空世界「出界」の百科事典です。";
+  elements.pageLead.textContent = "出界の百科事典です。";
   document.title = SITE_NAME;
 }
 
