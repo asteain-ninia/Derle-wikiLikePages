@@ -28,10 +28,11 @@ function parseScalarValue(rawValue) {
 function replaceWikiMarkupWithPlainText(text) {
   return text.replace(/\[\[([^[\]]+?)\]\]/g, (_match, token) => {
     const [targetPart, displayPart] = token.split("|");
-    const [pageTitle] = targetPart.split("#");
+    const [pageTitle, heading = ""] = targetPart.split("#");
     const displayText = displayPart?.trim();
 
-    return displayText || pageTitle.trim();
+    // [[#見出し]] (同じ記事内の見出しへのリンク) は見出しの文字を残す
+    return displayText || pageTitle.trim() || heading.trim();
   });
 }
 

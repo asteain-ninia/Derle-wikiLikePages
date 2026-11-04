@@ -38,10 +38,13 @@ src/
     site-config.js             # カテゴリ定義・参加導線・UI設定
     generated/
       content-data.js          # ビルド生成物 (記事レコード配列)
+      *.json                   # ビルド成果物 (backlinks / missing-pages / redirects / disambiguation / history)
+      maintenance-report.md    # 管理者向け保守レポート (.json も)
   lib/
     content-import.js          # 原稿取り込み・正規化
     home-page-model.js         # ホームページモデル
     article-page-model.js      # 記事・グラフ・リンク解決モデル
+    build-artifacts.js         # ビルド成果物・保守レポートの組み立て
     renderers.js               # HTML 描画
     template-registry.js       # テンプレートプラグイン自動検出・登録
     templates/                 # テンプレートハンドラ (プラグイン方式)
@@ -82,6 +85,7 @@ package.json
     - 各ファイルに対して `content-import.js` の `buildArticleRecord()` を呼び、記事レコードを生成する
     - Git 履歴 (`git log --follow`) から created / updated 日付を取得する
     - 結果を `src/data/generated/content-data.js` に ES Module として書き出す
+    - 同じ記事レコードから `build-artifacts.js` でビルド成果物と保守レポートを組み立て、`src/data/generated/` に書き出す (下記 3.5)。件数の要約を標準出力に出す
     - `draft: true` の原稿は除外し、本番原稿が 0 件ならサンプルにフォールバックする
 - `build-site.mjs`
     - `generate-content-data.mjs` を実行した後、`index.html`、`src/`、アセット類を `dist/` にコピーする
@@ -215,6 +219,14 @@ src/lib/templates/
 - `src/data/generated/content-data.js`
     - `generate-content-data.mjs` が生成する記事レコード配列と付帯情報
     - 手編集の対象にしない
+- `src/data/generated/*.json`, `maintenance-report.md`
+    - `generate-content-data.mjs` が生成するリンク解決結果のビルド成果物。`src/` ごと `dist/` にコピーされるので公開サイトからも読める
+    - `backlinks.json`: 記事 ID → `{ title, backlinks: [{ id, title }] }` (自己リンクを含む。SPA のバックリンク表示と同じ)
+    - `missing-pages.json`: 未解決リンクの配列 `{ title, referenceCount, sourceEntries, suggestions }`。参照元が多い順
+    - `redirects.json`: 一意に決まる別名 → `{ id, title }`
+    - `disambiguation.json`: 複数の記事のタイトル・別名になっている名前の配列 `{ title, candidates, sourceEntries }`。リンクされていない名前も載せる
+    - `history.json`: 記事 ID → `{ title, sourcePath, created, updated, history }`
+    - `maintenance-report.json` / `maintenance-report.md`: 管理者向け保守レポート (spec 9.7)。孤立ページ (他の記事からの被リンクが無い。自己リンクは数えない)、行き止まりページ (他の既存記事へのリンクが無い。曖昧リンクは候補一覧へ進めるので数え、未作成記事へのリンクは数えない)、未解決リンク、曖昧な名前、リンク密度 (出リンク・被リンク・未解決・本文 1000 字あたりのリンク数)。読者向け UI には載せない
 - `src/data/articles.js`
     - `generated/content-data.js` を re-export する薄いラッパー
 - `src/data/site-config.js`
@@ -236,6 +248,13 @@ UI に依存しない純粋なデータ変換・集計処理。Node の組み込
     - 本文内 wikilink のセグメント分割 (テキスト / 解決済みリンク / 赤リンク / 曖昧リンク)
     - レーベンシュタイン距離による近似ページ提案
     - ハッシュルーティング解析 (`#!article/...`, `#!missing/...`, `#!disambiguation/...`)
+    - 記事ごとの出リンク記録 (`outgoingLinksById`: 解決先の記事 ID・曖昧な名前・未作成の名前・リンク出現数)。`[[#見出し]]` は同じ記事内のリンクなので数えない
+    - `[[#見出し]]` は描画中の記事の見出しへのリンクにする。`[[記事#見出し]]` も含め、見出しが完全一致しなければその名前で始まる見出しへ飛ぶ (`matchSectionHeading`)
+- `src/lib/build-artifacts.js`
+    - `buildWikiGraph` の結果からビルド成果物 (backlinks / missing-pages / redirects / disambiguation / history) と保守レポートを組み立てる。リンク解決は自前で持たない
+    - 保守レポートの Markdown 描画
+    - サイトでは `renderers.js` の `renderMaintenanceReportPage` が `maintenance-report.json` を記事と同じ見た目で描画する (`#!maintenance`)
+    - `IGNORED_MISSING_TITLES` (いまは `TODO`) へのリンクは「あとで書く」の印なので、missing-pages.json と保守レポートの未解決リンクに数えない
 
 ### 3.7 View (`src/lib/renderers.js`)
 
@@ -280,7 +299,7 @@ HTML 文字列を返す描画関数群。DOM 操作は含まない。
 - **スケーラビリティ**: 記事数が増えると `content-data.js` が肥大化し、初回ロードが重くなる
 - **SEO**: ハッシュルーティングはクローラーに不利。OGP メタタグも記事ごとに設定できない
 - **直リンク**: `#!article/...` 形式の URL は共有時に不安定になりやすい
-- **ビルド成果物**: バックリンクや未解決リンクの一覧をビルド成果物として出力していない
+- **ビルド成果物**: バックリンクや未解決リンクの一覧は `src/data/generated/*.json` に出力するが、SPA は使わずクライアント側で計算し直している
 
 仕様 (spec.md 8.8) では「原稿から生成された HTML を正とする」と明記されており、最終的には記事ごとの静的 HTML 生成に移行する必要がある。
 
@@ -306,6 +325,7 @@ HTML 文字列を返す描画関数群。DOM 操作は含まない。
 - `tests/renderers.test.js`: HTML エスケープ、各描画関数の出力検証 (XSS 回避含む)、インライン Markdown 変換、外部リンク、safe HTML タグ、リスト描画、画像埋め込み、callout、インフォボックス描画、ノーティス描画、テンプレートモデル描画
 - `tests/content-import.test.js`: frontmatter パース、テンプレート抽出、セクション分割、記事レコード生成、テンプレートハンドラ統合、callout 抽出、インライン書式保持
 - `tests/article-page-model.test.js`: Wiki グラフ構築、リンク解決、曖昧さ回避、セグメント分割、埋め込みセグメント、ルーティング解析、テンプレートモデル内 wikilink 解決
+- `tests/build-artifacts.test.js`: 出リンク記録、各ビルド成果物、本文字数、孤立 / 行き止まり / リンク密度、保守レポート Markdown
 
 ### 6.2 テスト未整備
 
@@ -353,11 +373,11 @@ HTML 文字列を返す描画関数群。DOM 操作は含まない。
 ### Phase 3: 静的サイト生成への移行
 
 1. **記事ごとの HTML 生成** — SPA から SSG (Static Site Generation) へ移行する
-2. **ビルド成果物の出力** — backlinks.json, missing-pages.json, redirects.json, disambiguation.json, history.json
+2. ~~**ビルド成果物の出力**~~ — 実装済み (backlinks.json, missing-pages.json, redirects.json, disambiguation.json, history.json。`src/data/generated/`)
 3. **build:site の拡充** — バンドル、ミニファイ、OGP メタタグ注入、サイトマップ生成
 
 ### Phase 4: 運用基盤
 
 2. **Obsidian 運用ガイド作成** — 執筆者向けセットアップガイド
 3. **ページ履歴表示** — Git 履歴からの更新履歴一覧と GitHub へのリンク
-4. **管理者向け保守レポート** — 孤立ページ、行き止まりページ、未解決リンク一覧、リンク密度
+4. ~~**管理者向け保守レポート**~~ — 実装済み (`src/data/generated/maintenance-report.md`。孤立ページ、行き止まりページ、未解決リンク一覧、リンク密度)

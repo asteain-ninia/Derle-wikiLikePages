@@ -1,5 +1,9 @@
 import { formatDisplayDate } from "./home-page-model.js";
-import { buildArticleHref } from "./article-page-model.js";
+import {
+  buildArticleHref,
+  buildDisambiguationHref,
+  buildMissingPageHref,
+} from "./article-page-model.js";
 
 export function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, (character) => {
@@ -897,4 +901,173 @@ export function renderTemplateModels(templateModels) {
       return "";
     })
     .join("");
+}
+
+function renderReportRefs(refs, buildHref = (ref) => buildArticleHref(ref.id)) {
+  if (refs.length === 0) {
+    return "—";
+  }
+  return refs
+    .map((ref) => `<a href="${escapeHtml(buildHref(ref))}">${escapeHtml(ref.title)}</a>`)
+    .join("、");
+}
+
+function renderReportTable(headers, rows) {
+  const headHtml = headers
+    .map(([label, numeric]) => `<th${numeric ? ' class="is-numeric"' : ""}>${escapeHtml(label)}</th>`)
+    .join("");
+  const bodyHtml = rows
+    .map(
+      (cells) =>
+        `<tr>${cells
+          .map((cell, index) => `<td${headers[index][1] ? ' class="is-numeric"' : ""}>${cell}</td>`)
+          .join("")}</tr>`
+    )
+    .join("");
+  return `<div class="wikitable-scroll"><table class="wikitable report-table"><thead><tr>${headHtml}</tr></thead><tbody>${bodyHtml}</tbody></table></div>`;
+}
+
+// generatedAt は UTC の ISO 文字列なので、日本時間の「2026.11.05 09:30」にする
+function formatReportTime(isoString) {
+  const date = new Date(isoString);
+  if (Number.isNaN(date.getTime())) {
+    return String(isoString);
+  }
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Asia/Tokyo",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    })
+      .formatToParts(date)
+      .map(({ type, value }) => [type, value])
+  );
+  return `${parts.year}.${parts.month}.${parts.day} ${parts.hour}:${parts.minute}`;
+}
+
+// 保守レポート (build:content が書き出す maintenance-report.json) のページ
+export function renderMaintenanceReportPage(report, { loading = false } = {}) {
+  const page = (body) => `
+    <article class="article-page article-page--report">
+      <nav class="breadcrumbs" aria-label="パンくず">
+        <a href="#overview">メインページ</a>
+        <span class="breadcrumbs__separator" aria-hidden="true">/</span>
+        <span>保守レポート</span>
+      </nav>
+
+      <header class="article-page__header">
+        <p class="article-page__eyebrow">保守レポート</p>
+        <h2>保守レポート</h2>
+        <p class="article-page__summary">
+          記事どうしのリンクのつながりをまとめたものです。${
+            report ? `生成: ${escapeHtml(formatReportTime(report.generatedAt))}` : ""
+          }
+        </p>
+      </header>
+
+      <div class="article-page__body article-page__body--full">
+        ${body}
+      </div>
+    </article>
+  `;
+
+  if (!report) {
+    return page(
+      `<p class="empty-note">${loading ? "読み込み中…" : "保守レポートを読み込めませんでした。"}</p>`
+    );
+  }
+
+  const { summary } = report;
+  const section = (heading, note, content) => `
+    <section class="article-section">
+      <h3 class="article-section__heading">${escapeHtml(heading)}</h3>
+      ${note ? `<p>${escapeHtml(note)}</p>` : ""}
+      ${content}
+    </section>
+  `;
+  const emptyNote = '<p class="empty-note">なし</p>';
+  const articleLink = (row) => `<a href="${escapeHtml(buildArticleHref(row.id))}">${escapeHtml(row.title)}</a>`;
+
+  const summaryRows = [
+    ["記事数", summary.articleCount],
+    ["内部リンク (出現数)", summary.linkCount],
+    ["記事間リンク (重複除く)", summary.articleLinkCount],
+    ["1 記事あたりの出リンク / 被リンク", `${summary.averageOutgoingArticles} / ${summary.averageIncoming}`],
+    ["未解決リンク (名前 / 参照数)", `${summary.missingPageCount} / ${summary.missingReferenceCount}`],
+    ["曖昧な名前", summary.ambiguousNameCount],
+    ["孤立ページ", summary.orphanCount],
+    ["行き止まりページ", summary.deadEndCount],
+  ].map(([label, value]) => [escapeHtml(label), escapeHtml(String(value))]);
+
+  const orphansHtml =
+    report.orphans.length === 0
+      ? emptyNote
+      : `<ul>${report.orphans.map((row) => `<li>${articleLink(row)}</li>`).join("")}</ul>`;
+
+  const deadEndsHtml =
+    report.deadEnds.length === 0
+      ? emptyNote
+      : `<ul>${report.deadEnds
+          .map((row) => {
+            const missing = renderReportRefs(
+              row.missingTitles.map((title) => ({ title })),
+              (ref) => buildMissingPageHref(ref.title)
+            );
+            const note = row.missingTitles.length > 0 ? ` — 未作成へのリンク: ${missing}` : "";
+            return `<li>${articleLink(row)}${note}</li>`;
+          })
+          .join("")}</ul>`;
+
+  const missingHtml =
+    report.missingPages.length === 0
+      ? emptyNote
+      : renderReportTable(
+          [["名前"], ["参照元数", true], ["参照元"]],
+          report.missingPages.map((missingPage) => [
+            `<a class="wiki-link wiki-link--missing" href="${escapeHtml(buildMissingPageHref(missingPage.title))}">${escapeHtml(missingPage.title)}</a>`,
+            String(missingPage.referenceCount),
+            renderReportRefs(missingPage.sourceEntries),
+          ])
+        );
+
+  const ambiguousHtml =
+    report.ambiguousNames.length === 0
+      ? emptyNote
+      : renderReportTable(
+          [["名前"], ["候補"], ["参照元"]],
+          report.ambiguousNames.map((name) => [
+            `<a href="${escapeHtml(buildDisambiguationHref(name.title))}">${escapeHtml(name.title)}</a>`,
+            renderReportRefs(name.candidates),
+            renderReportRefs(name.sourceEntries),
+          ])
+        );
+
+  const densityRows = [...report.linkDensity]
+    .sort((left, right) => left.linksPer1000Chars - right.linksPer1000Chars || left.title.localeCompare(right.title, "ja-JP"))
+    .map((row) => [
+      articleLink(row),
+      String(row.outgoingArticleCount),
+      String(row.incomingCount),
+      String(row.missingCount),
+      String(row.ambiguousCount),
+      String(row.textLength),
+      String(row.linksPer1000Chars),
+    ]);
+  const densityHtml = renderReportTable(
+    [["記事"], ["出リンク", true], ["被リンク", true], ["未解決", true], ["曖昧", true], ["字数", true], ["1000 字あたり", true]],
+    densityRows
+  );
+
+  return page(`
+    ${section("概要", "", renderReportTable([["項目"], ["値", true]], summaryRows))}
+    ${section("孤立ページ", "ほかの記事から一度もリンクされていない記事。", orphansHtml)}
+    ${section("行き止まりページ", "ほかの既存の記事へのリンクが無い記事 (未作成の記事へのリンクだけの記事を含む)。", deadEndsHtml)}
+    ${section("未解決リンク", "リンク先の記事が無い名前。参照元が多い順。TODO へのリンクは数えない。", missingHtml)}
+    ${section("曖昧な名前", "複数の記事のタイトル・別名になっている名前。", ambiguousHtml)}
+    ${section("リンク密度", "1000 字あたりのリンク数が少ない順。字数は空白を除いた本文・表・脚注・インフォボックスの文字数。", densityHtml)}
+  `);
 }

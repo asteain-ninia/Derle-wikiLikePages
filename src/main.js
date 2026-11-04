@@ -23,6 +23,7 @@ import {
   renderFeaturedArticle,
   renderMissingPage,
   renderNotFoundPage,
+  renderMaintenanceReportPage,
   renderPreviewArticle,
   renderSearchResults,
   renderSummaryList,
@@ -151,6 +152,13 @@ function updatePageHeader(route) {
     return;
   }
 
+  if (route.view === "maintenance") {
+    elements.pageHeading.textContent = "保守レポート";
+    elements.pageLead.textContent = "記事どうしのリンクのつながりをまとめたものです。";
+    document.title = `保守レポート - WikiLikePages`;
+    return;
+  }
+
   elements.pageHeading.textContent = "メインページ";
   elements.pageLead.textContent = "架空世界の知識を集め、つなげる百科事典です。";
   document.title = "WikiLikePages";
@@ -217,6 +225,27 @@ function renderDetailView(route) {
   if (route.view === "category") {
     elements.detailView.innerHTML = renderCategoryPage(route.category, articles);
     window.scrollTo({ top: 0, behavior: "smooth" });
+    return;
+  }
+
+  if (route.view === "maintenance") {
+    elements.detailView.innerHTML = renderMaintenanceReportPage(null, { loading: true });
+    window.scrollTo({ top: 0 });
+    loadMaintenanceReport().then((report) => {
+      if (state.route.view === "maintenance") {
+        elements.detailView.innerHTML = renderMaintenanceReportPage(report);
+      }
+    });
+  }
+}
+
+// build:content が書き出した保守レポート。公開サイトでも src/ ごと配信されるので同じ場所から読める
+async function loadMaintenanceReport() {
+  try {
+    const response = await fetch("src/data/generated/maintenance-report.json", { cache: "no-cache" });
+    return response.ok ? await response.json() : null;
+  } catch {
+    return null;
   }
 }
 
