@@ -5,8 +5,10 @@ import {
   buildArticleHref,
   buildArticlePageModel,
   buildDisambiguationPageModel,
+  buildMissingPageHref,
   buildMissingPageModel,
   buildReferenceIndex,
+  buildSectionAnchorId,
   buildWikiGraph,
   buildWikiTextSegments,
   extractWikiLinks,
@@ -573,6 +575,36 @@ test("buildWikiTextSegments は [[#見出し]] を同じ記事の見出しへの
 
   const pageModel = buildArticlePageModel(graph, "gods");
   assert.equal(pageModel.unresolvedLinkCount, 0);
+});
+
+test("buildArticlePageModel は見出しの中の [[リンク]] を headingSegments で解決し、id と平文の見出しは変えない", () => {
+  const world = {
+    id: "world",
+    title: "出界",
+    sections: [
+      { heading: "概要", sourceHeading: "", paragraphs: [] },
+      { heading: "ラウム圏", sourceHeading: "[[ラウム圏]]", level: 3, paragraphs: [] },
+      { heading: "コルニア圏（南極圏）", sourceHeading: "[[コルニア圏]]（南極圏）", level: 3, paragraphs: [] },
+    ],
+  };
+  const raum = { id: "raum", title: "ラウム圏", sections: [] };
+  const graph = buildWikiGraph([world, raum]);
+
+  const pageModel = buildArticlePageModel(graph, "world");
+  const [overview, raumSection, corniaSection] = pageModel.sections;
+  assert.deepEqual(overview.headingSegments, [{ type: "text", value: "概要" }]);
+  assert.deepEqual(raumSection.headingSegments, [
+    { type: "link", status: "resolved", href: buildArticleHref("raum"), label: "ラウム圏", title: "ラウム圏" },
+  ]);
+  assert.equal(raumSection.heading, "ラウム圏");
+  assert.equal(raumSection.anchorId, buildSectionAnchorId("ラウム圏"));
+  assert.deepEqual(corniaSection.headingSegments, [
+    { type: "link", status: "missing", href: buildMissingPageHref("コルニア圏"), label: "コルニア圏", title: "コルニア圏" },
+    { type: "text", value: "（南極圏）" },
+  ]);
+  assert.equal(corniaSection.anchorId, buildSectionAnchorId("コルニア圏（南極圏）"));
+  // 見出しの未作成リンクもリンク状況の件数に入れる
+  assert.equal(pageModel.unresolvedLinkCount, 1);
 });
 
 test("parseAppRoute は #!maintenance を保守レポートのページにする", () => {

@@ -673,9 +673,13 @@ export function renderArticlePage(pageModel) {
               const level = Math.min(Math.max(section.level ?? 2, 2), 5);
               const tag = `h${level + 1}`;
               const subClass = level > 2 ? " article-section--sub" : "";
+              // 見出しの中の [[リンク]] は本文と同じ描画 (headingSegments)。目次は平文の heading
+              const headingHtml = section.headingSegments
+                ? renderParagraphSegments(section.headingSegments)
+                : escapeHtml(section.heading);
               return `
                 <section class="article-section${subClass}" id="${escapeHtml(section.anchorId)}">
-                  <${tag} class="article-section__heading">${escapeHtml(section.heading)}</${tag}>
+                  <${tag} class="article-section__heading">${headingHtml}</${tag}>
                   ${renderSectionParagraphs(section.paragraphs)}
                 </section>
               `;

@@ -652,8 +652,15 @@ export function buildArticlePageModel(graph, entryId) {
       return segments;
     });
 
+    // 見出しの中の [[リンク]] も本文と同じくリンクにする。目次と移動先の id は平文の heading のまま
+    const headingSegments = buildWikiTextSegments(section.sourceHeading || section.heading, graph, entry);
+    unresolvedLinkCount += headingSegments.filter(
+      (segment) => segment.type === "link" && segment.status !== "resolved"
+    ).length;
+
     return {
       heading: section.heading,
+      headingSegments,
       level: section.level ?? 2,
       anchorId: buildSectionAnchorId(section.heading),
       paragraphs,
