@@ -82,6 +82,12 @@ function plainFootnoteMarks(text) {
 
 const APOSTROPHE = "&#39;";
 const APOSTROPHE_RUN = /((?:&#39;){2,})/;
+const ENTITY_CHARS = { "&#39;": "'", "&quot;": '"', "&amp;": "&", "&lt;": "<", "&gt;": ">" };
+
+// escapeHtml が作った実体参照を文字に戻す (文字数を数える用。退避した断片はそのまま)
+function decodeEntities(text) {
+  return text.replace(/&(?:#39|quot|amp|lt|gt);/g, (entity) => ENTITY_CHARS[entity]);
+}
 
 // MediaWiki の '' (斜体) / ''' (太字) / ''''' (両方) を、MediaWiki の Parser::doQuotes と同じ手順で
 // 行ごとに字句単位で処理する。正規表現で前から組にすると、別の強調を閉じる ''''' を次の ''''' の
@@ -122,7 +128,8 @@ function renderQuoteLine(line) {
     let firstSpace = -1;
     for (let index = 1; index < parts.length; index += 2) {
       if (counts[index] !== 3) continue;
-      const before = parts[index - 1];
+      // 直前の文字はエスケープ済み (&amp; など) なので、戻した文字で「1 文字の語」かどうかを見る
+      const before = decodeEntities(parts[index - 1]);
       if (before.slice(-1) === " ") {
         if (firstSpace === -1) firstSpace = index;
       } else if (before.slice(-2, -1) === " ") {
@@ -198,8 +205,9 @@ export function renderInlineMarkdown(escapedText) {
       hold(`<sup class="footnote-ref" id="fnref-${number}"><a href="#fn-${number}">[${number}]</a></sup>`)
     )
     .replace(/`([^`\n]+?)`/g, (_match, code) => hold(`<code class="inline-code">${code}</code>`))
+    // Markdown の [ラベル](URL)。URL に退避済みの断片 (脚注番号など) は含めない (属性が壊れる)
     .replace(
-      /\[([^\]]+?)\]\((https?:\/\/[^)\s]+)\)/g,
+      /\[([^\]]+?)\]\((https?:\/\/[^)\s]+)\)/g,
       (_match, label, url) =>
         `${hold(`<a href="${url}" class="external-link" rel="noopener noreferrer">`)}${label}${hold("</a>")}`
     )
@@ -214,7 +222,8 @@ export function renderInlineMarkdown(escapedText) {
           : hold(`${openTag}${url}</a>`);
       }
     )
-    .replace(/&lt;(https?:\/\/[^\s&]+?)&gt;/g, (_match, url) =>
+    // <URL> も同じく退避済みの断片は URL に含めない
+    .replace(/&lt;(https?:\/\/[^\s&]+?)&gt;/g, (_match, url) =>
       hold(`<a href="${url}" class="external-link" rel="noopener noreferrer">${url}</a>`)
     )
     .replace(/\*\*\*(.+?)\*\*\*/g, "<strong><em>$1</em></strong>");

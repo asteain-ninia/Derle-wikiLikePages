@@ -1050,6 +1050,25 @@ test("renderInlineMarkdown は脚注番号の印をタグの属性値や URL の
     renderInlineMarkdown(escapeHtml("'''太字1'''")),
     '<strong>太字<sup class="footnote-ref" id="fnref-1"><a href="#fn-1">[1]</a></sup></strong>'
   );
+  // Markdown の [ラベル](URL) と <URL> の URL にも入らない (リンクにはならず、文字と上付きの番号になる)
+  const sup = '<sup class="footnote-ref" id="fnref-1"><a href="#fn-1">[1]</a></sup>';
+  for (const [input, expected] of [
+    ["[ラベル](https://example.com/1)", `[ラベル](https://example.com/${sup})`],
+    ["<https://example.com/1>", `&lt;https://example.com/${sup}&gt;`],
+  ]) {
+    const output = renderInlineMarkdown(escapeHtml(input));
+    assert.equal(output, expected, input);
+    assert.doesNotMatch(output, /href="[^"]*<sup/, input);
+  }
+});
+
+test("renderInlineMarkdown の引用符の対応付けは、実体参照 (&amp; など) を文字に戻して「1 文字の語」を見る", () => {
+  // MediaWiki は aa<b>b &'<i>c</i> d</b> にする (& が 1 文字の語なので、その直後の ''' を「' + ''」に読み替える)。
+  // 末尾の 2 文字を &amp; のまま見ると別の ''' を選んでしまう
+  assert.equal(
+    renderInlineMarkdown(escapeHtml("aa'''b &'''c'' d'''")),
+    "aa<strong>b &amp;&#39;<em>c</em> d</strong>"
+  );
 });
 
 test("renderArticlePage はリンクの表示文字や画像の説明に残った脚注番号の印を平文の [N] にする", () => {

@@ -659,17 +659,25 @@ function plainFootnoteMarks(text) {
   return text.replace(FOOTNOTE_MARK, "[$1]");
 }
 
-// [[リンク]] や ![[画像]] の中に入った印は、リンク先の名前・表示文字・画像の説明に混ざらないよう
-// リンクの直後へ出す ([[B<ref>x</ref>]] → [[B]] + 印)。名前に印が残ると未解決リンクの一覧や
-// キーワードに漏れ、表示文字に残るとリンクの中にリンクができる
+// リンクの中に入った印は、リンク先の名前・表示文字・画像の説明・URL に混ざらないようリンクの
+// 直後へ出す ([[B<ref>x</ref>]] → [[B]] + 印)。名前に印が残ると未解決リンクの一覧やキーワードに
+// 漏れ、表示文字に残るとリンクの中にリンクができ、URL に残ると属性が壊れる。
+// 対象: [[リンク]] / ![[画像]]、MediaWiki の [URL ラベル]、Markdown の [ラベル](URL)
+const LINK_PATTERNS = [
+  /!?\[\[[^[\]]*?\]\]/g,
+  /\[https?:\/\/[^\s[\]<>"]+(?:[ \t]+[^\]\n]+?)?[ \t]*\]/g,
+  /\[[^\]]+?\]\(https?:\/\/[^)\s]+\)/g,
+];
+
 function moveFootnoteMarksOutOfLinks(text) {
-  return text.replace(/(!?)\[\[([^[\]]*?)\]\]/g, (match, embedMark, token) => {
-    const marks = token.match(FOOTNOTE_MARK) ?? [];
-    if (marks.length === 0) {
-      return match;
-    }
-    return `${embedMark}[[${token.replace(FOOTNOTE_MARK, "")}]]${marks.join("")}`;
-  });
+  return LINK_PATTERNS.reduce(
+    (result, pattern) =>
+      result.replace(pattern, (link) => {
+        const marks = link.match(FOOTNOTE_MARK) ?? [];
+        return marks.length === 0 ? link : `${link.replace(FOOTNOTE_MARK, "")}${marks.join("")}`;
+      }),
+    text
+  );
 }
 
 function processFootnotes(text) {

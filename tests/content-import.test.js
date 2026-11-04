@@ -814,3 +814,22 @@ test("buildArticleRecord は [[リンク]] や ![[画像]] の中の <ref> を�
   const callout = article.sections[0].paragraphs.find((paragraph) => paragraph.type === "callout");
   assert.equal(callout.title, "題[4]");
 });
+
+test("buildArticleRecord は外部リンク ([URL ラベル] と [ラベル](URL)) の中の <ref> もリンクの直後の脚注番号にする", () => {
+  const article = buildArticleRecord({
+    relativePath: "test.md",
+    fileBasename: "テスト",
+    created: "2026-03-20",
+    updated: "2026-03-23",
+    sourceText:
+      "[https://example.com/ ラベル<ref>x</ref>]と[ラベル<ref>y</ref>](https://example.com/)と[https://example.com/<ref>z</ref> 外部]。",
+  });
+
+  assert.deepEqual(article.footnotes, ["x", "y", "z"]);
+  assert.equal(
+    article.sections[0].paragraphs[0],
+    "[https://example.com/ ラベル]1と[ラベル](https://example.com/)2と[https://example.com/ 外部]3。"
+  );
+  // 要約の平文でもラベルだけが残り、番号は [N] になる
+  assert.equal(article.summary, "ラベル[1]とラベル[2]と外部[3]。");
+});
