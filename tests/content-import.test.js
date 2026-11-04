@@ -624,6 +624,79 @@ test("parseMarkdownSections parses nested lists (** and ##)", () => {
   );
 });
 
+const listMarkers = (sourceText) =>
+  parseMarkdownSections(sourceText)
+    .flatMap((section) => section.paragraphs)
+    .filter((paragraph) => paragraph.type === "list-item")
+    .map(({ markers, body }) => [markers, body]);
+
+test("parseMarkdownSections は Markdown の字下げ (タブ) でリストを入れ子にする", () => {
+  assert.deepEqual(listMarkers("- 親\n\t- 子\n\t\t- 孫\n\t- 子2\n- 次"), [
+    ["*", "親"],
+    ["**", "子"],
+    ["***", "孫"],
+    ["**", "子2"],
+    ["*", "次"],
+  ]);
+});
+
+test("parseMarkdownSections は 2 文字以上のスペースの字下げも入れ子にし、1 文字は同じ深さにする", () => {
+  assert.deepEqual(listMarkers("- 親\n  - 子\n    - 孫\n- 次\n - 次2"), [
+    ["*", "親"],
+    ["**", "子"],
+    ["***", "孫"],
+    ["*", "次"],
+    ["*", "次2"],
+  ]);
+  assert.deepEqual(listMarkers("* 親\n    * 子\n        * 孫"), [
+    ["*", "親"],
+    ["**", "子"],
+    ["***", "孫"],
+  ]);
+});
+
+test("parseMarkdownSections は字下げした番号付きと箇条書きの混在を #* / *# にする", () => {
+  assert.deepEqual(listMarkers("1. 手順一\n\t- 補足\n\t- 補足2\n2. 手順二"), [
+    ["#", "手順一"],
+    ["#*", "補足"],
+    ["#*", "補足2"],
+    ["#", "手順二"],
+  ]);
+  assert.deepEqual(listMarkers("- 項目\n\t1. 一\n\t2. 二\n- 項目2"), [
+    ["*", "項目"],
+    ["*#", "一"],
+    ["*#", "二"],
+    ["*", "項目2"],
+  ]);
+});
+
+test("parseMarkdownSections は段落や見出しを挟むと字下げの入れ子を仕切り直す", () => {
+  // 字下げから始まるリストは最上位から数える (空の親を作らない)。空行だけなら入れ子は続く
+  assert.deepEqual(listMarkers("- 親\n\t- 子\n\n\t- 子2\n\n段落\n\n\t- 別のリスト\n## 節\n\t- 節のリスト"), [
+    ["*", "親"],
+    ["**", "子"],
+    ["**", "子2"],
+    ["*", "別のリスト"],
+    ["*", "節のリスト"],
+  ]);
+});
+
+test("parseMarkdownSections は中途半端な字下げを近い浅い階層の子にし、MediaWiki 式の ** と混ぜても壊れない", () => {
+  // 0 → 4 → 2: 2 は 4 の階層を閉じ、親 (0) の子 (= 子2 の兄弟のリスト) になる
+  assert.deepEqual(listMarkers("- 親\n    - 子\n  - 子2\n    - 孫"), [
+    ["*", "親"],
+    ["**", "子"],
+    ["**", "子2"],
+    ["***", "孫"],
+  ]);
+  assert.deepEqual(listMarkers("* 親\n** 子\n\t- 子2\n- 次"), [
+    ["*", "親"],
+    ["**", "子"],
+    ["**", "子2"],
+    ["*", "次"],
+  ]);
+});
+
 test("parseMarkdownSections parses <poem> blocks", () => {
   const article = buildArticleRecord({
     relativePath: "test.wiki",
