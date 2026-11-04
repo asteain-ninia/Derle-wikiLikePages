@@ -296,7 +296,8 @@ export function extractLeadingTemplates(sourceText) {
     const range = templateRanges[i];
     body = body.slice(0, range.start) + body.slice(range.end);
   }
-  body = body.replace(/^\s+/, "").replace(/\n{3,}/g, "\n\n");
+  // 先頭の空行だけ落とす (行頭の空白まで落とすと、原稿の最初の行のリストの字下げが消える)
+  body = body.replace(/^(?:[ \t]*\n)+/, "").replace(/\n{3,}/g, "\n\n");
 
   return {
     templates,
@@ -756,10 +757,14 @@ function extractCategoryTags(text) {
   return { text: cleaned, categoryTags: tags };
 }
 
-// 行頭の字下げの幅 (タブは 4 文字分)。Markdown 式のリストの入れ子の深さに使う
+// 行頭の字下げの幅。Markdown 式のリストの入れ子の深さに使う。
+// タブは CommonMark と同じく次のタブ位置 (4 文字ごと) まで進める (スペースとタブが混ざっても同じ幅になる)
 function measureIndent(rawLine) {
-  const leading = /^[ \t]*/.exec(rawLine)[0];
-  return leading.replace(/\t/g, "    ").length;
+  let width = 0;
+  for (const character of /^[ \t]*/.exec(rawLine)[0]) {
+    width = character === "\t" ? width + 4 - (width % 4) : width + 1;
+  }
+  return width;
 }
 
 function buildParagraphs(lines) {
@@ -1398,7 +1403,10 @@ export function buildArticleRecord({
     /\{\{main\|([^}]+)\}\}/gi,
     (_match, articleName) => `\x00MAIN:${articleName.trim()}\x00`
   );
-  const cleanedBody = stripInlineTemplates(bodyWithMainConverted).trim();
+  // 先頭の空行と末尾の空白だけ落とす (最初の行の字下げはリストの入れ子に使うので残す)
+  const cleanedBody = stripInlineTemplates(bodyWithMainConverted)
+    .replace(/^(?:[ \t]*\n)+/, "")
+    .trimEnd();
   const restoredBody = restoreNowiki(cleanedBody, nowikiPlaceholders);
   const sections = parseMarkdownSections(restoredBody);
   const leadParagraphs = buildSummaryParagraphs(sections);

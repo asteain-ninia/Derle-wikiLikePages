@@ -681,6 +681,48 @@ test("parseMarkdownSections は段落や見出しを挟むと字下げの入れ�
   ]);
 });
 
+test("buildArticleRecord は原稿の最初の行の字下げを残す (frontmatter や先頭のテンプレートの直後でも同じ深さ)", () => {
+  const markersOf = (sourceText) =>
+    buildArticleRecord({
+      relativePath: "test.md",
+      fileBasename: "テスト",
+      created: "2026-03-20",
+      updated: "2026-03-23",
+      sourceText,
+    })
+      .sections.flatMap((section) => section.paragraphs)
+      .filter((paragraph) => paragraph.type === "list-item")
+      .map(({ markers, body }) => [markers, body]);
+
+  // CRLF の原稿で frontmatter の直後からリストが始まる。最初の行の字下げが消えると b が a の子になってしまう
+  assert.deepEqual(markersOf("---\r\n公開: true\r\n---\r\n\t- a\r\n\t- b\r\n- c"), [
+    ["*", "a"],
+    ["*", "b"],
+    ["*", "c"],
+  ]);
+  // 先頭のインフォボックスの直後
+  assert.deepEqual(markersOf("{{基礎情報 国\n|名前=テスト\n}}\n\t- a\n\t- b\n- c"), [
+    ["*", "a"],
+    ["*", "b"],
+    ["*", "c"],
+  ]);
+  // 先頭の空行は従来どおり落ちる
+  assert.deepEqual(markersOf("\n\n- a\n\t- b"), [
+    ["*", "a"],
+    ["**", "b"],
+  ]);
+});
+
+test("parseMarkdownSections はタブを次のタブ位置まで進めるので、スペースとタブが混ざっても幅が揃う", () => {
+  // "  \t" は 2 文字 + 次のタブ位置 (4) = 幅 4 で、"\t" と同じ深さ
+  assert.deepEqual(listMarkers("- a\n\t- b\n  \t- c\n   \t\t- d"), [
+    ["*", "a"],
+    ["**", "b"],
+    ["**", "c"],
+    ["***", "d"],
+  ]);
+});
+
 test("parseMarkdownSections は中途半端な字下げを近い浅い階層の子にし、MediaWiki 式の ** と混ぜても壊れない", () => {
   // 0 → 4 → 2: 2 は 4 の階層を閉じ、親 (0) の子 (= 子2 の兄弟のリスト) になる
   assert.deepEqual(listMarkers("- 親\n    - 子\n  - 子2\n    - 孫"), [
