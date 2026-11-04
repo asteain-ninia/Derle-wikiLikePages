@@ -49,6 +49,8 @@ function sanitizeInlineHtml(text) {
 function stripInlineFormatting(text) {
   // 描画側 (renderInlineMarkdown) と同じく、単語内の _ は強調として扱わない
   return text
+    // 脚注番号の印 (processFootnotes) は要約・検索用の平文では [N] の文字にする
+    .replace(/(\d+)/g, "[$1]")
     .replace(/\[([^\]]+?)\]\(https?:\/\/[^)\s]+\)/g, "$1")
     // MediaWiki の外部リンク [URL ラベル] はラベル、[URL] は URL だけを残す
     .replace(/\[(https?:\/\/[^\s[\]<>"]+)(?:[ \t]+([^\]\n]+?))?[ \t]*\]/g, (_match, url, label) => label ?? url)
@@ -646,6 +648,11 @@ function extractBlockquotes(text) {
   return parts;
 }
 
+// 本文に残す脚注番号の印。描画 (renderers.js の renderInlineMarkdown) が脚注へ飛ぶ上付きのリンク [N] にし、
+// 平文化 (stripInlineFormatting) では [N] の文字にする。原稿の [1] と区別するため私用領域の文字で挟む
+const FOOTNOTE_REF_OPEN = "";
+const FOOTNOTE_REF_CLOSE = "";
+
 function processFootnotes(text) {
   const footnotes = [];
   const processed = text.replace(/<ref(?:\s[^>]*)?>[\s\S]*?<\/ref>/gi, (match) => {
@@ -654,7 +661,7 @@ function processFootnotes(text) {
       return "";
     }
     footnotes.push(bodyMatch[1].trim());
-    return `[${footnotes.length}]`;
+    return `${FOOTNOTE_REF_OPEN}${footnotes.length}${FOOTNOTE_REF_CLOSE}`;
   });
   const cleaned = processed.replace(/<references\s*\/>/gi, "");
   return { text: cleaned, footnotes };

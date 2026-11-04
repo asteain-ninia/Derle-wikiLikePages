@@ -34,7 +34,7 @@
 - `core.autocrlf=true` のため作業ツリーは CRLF。複数行の置換は改行コードに注意
 - 画像が大きい (計 90MB 程度) ので、このリポジトリは `http.postBuffer` を 500MB にしてある (ローカル設定)
 - リスト項目は `{ type: "list-item", markers, body }` (markers は MediaWiki 式の `*` / `#` / `#*` …)。描画は `renderers.js` の `renderList`
-- `renderInlineMarkdown` は生成済みタグ・コード・URL をプレースホルダ (U+E020/U+E021) に退避してから強調記法を処理する。nowiki のセンチネルは U+E010〜U+E017
+- `renderInlineMarkdown` は生成済みタグ・コード・URL をプレースホルダ (U+E020/U+E021) に退避してから強調記法を処理する。nowiki のセンチネルは U+E010〜U+E017。`<ref>` の脚注番号は `content-import.js` が U+E018〜U+E019 で挟んで本文に残し、描画で脚注の一覧 (`id="fn-N"`) へ飛ぶ上付きのリンク `[N]` にする (ページ内の id へのリンクは `main.js` が自分で移動する。ハッシュを変えるとメインページへ戻るため)
 - `build:content` は記事データと一緒にリンクの解決結果 (`backlinks.json` など) と保守レポート (`src/data/generated/maintenance-report.md`: 孤立・行き止まり・未解決リンク・リンク密度) を書き出す。組み立ては `src/lib/build-artifacts.js` で、リンク解決は `buildWikiGraph` を使う。サイト内では `#!maintenance` (メインページ下の小さなリンク) が `maintenance-report.json` を読んで記事と同じ見た目で表示する
 - サイト名は「出界百科」(`index.html` と `src/main.js` の `SITE_NAME`)
 - 節は見出しの深さ `level` を持つ (## = 2)。目次は深さで入れ子にし、本文の見出しは ## を h3、### 以下を h4〜h6 にする

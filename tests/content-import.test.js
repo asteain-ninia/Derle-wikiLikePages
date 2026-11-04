@@ -415,8 +415,9 @@ test("buildArticleRecord extracts footnotes from <ref> tags", () => {
   assert.equal(article.footnotes.length, 2);
   assert.equal(article.footnotes[0], "注釈1");
   assert.equal(article.footnotes[1], "注釈2");
-  assert.match(article.sections[0].paragraphs[0], /\[1\]/);
-  assert.match(article.sections[0].paragraphs[0], /\[2\]/);
+  // 本文には脚注番号の印 (U+E018 番号 U+E019) が残る。描画で [N] の上付きリンクになる
+  assert.match(article.sections[0].paragraphs[0], /1/);
+  assert.match(article.sections[0].paragraphs[0], /2/);
 });
 
 test("buildArticleRecord extracts [[Category:...]] as tags", () => {
@@ -765,4 +766,21 @@ test("parseMarkdownSections は見出しの深さを level に残す", () => {
     sections.map((section) => [section.heading, section.level]),
     [["概要", 2], ["歴史", 2], ["起源", 3], ["東進", 3]]
   );
+});
+
+test("buildArticleRecord は脚注番号を印 (U+E018 番号 U+E019) で本文に残し、要約では [N] の文字にする", () => {
+  const article = buildArticleRecord({
+    relativePath: "test.md",
+    fileBasename: "テスト",
+    created: "2026-03-20",
+    updated: "2026-03-23",
+    sourceText: "2015年<ref>出典A</ref>に始まり、翌年<ref>出典B</ref>に終わった。原稿の [1] は残す。",
+  });
+
+  assert.deepEqual(article.footnotes, ["出典A", "出典B"]);
+  assert.equal(
+    article.sections[0].paragraphs[0],
+    "2015年1に始まり、翌年2に終わった。原稿の [1] は残す。"
+  );
+  assert.equal(article.summary, "2015年[1]に始まり、翌年[2]に終わった。原稿の [1] は残す。");
 });

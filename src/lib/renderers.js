@@ -118,6 +118,12 @@ export function renderInlineMarkdown(escapedText) {
     .replace(/&lt;(small|sup|sub)&gt;/gi, "<$1>")
     .replace(/&lt;\/(small|sup|sub)&gt;/gi, "</$1>")
     .replace(/&lt;br\s*\/?&gt;/gi, "<br>")
+    // 脚注番号の印 (content-import.js の processFootnotes が U+E018〜U+E019 で挟む) を、
+    // 脚注の一覧 (renderFootnotes の id="fn-N") へ飛ぶ上付きのリンクにする
+    .replace(
+      /(\d+)/g,
+      (_match, number) => `<sup class="footnote-ref" id="fnref-${number}"><a href="#fn-${number}">[${number}]</a></sup>`
+    )
     .replace(/\uE010/g, "[")
     .replace(/\uE011/g, "]")
     .replace(/\uE012/g, "{")

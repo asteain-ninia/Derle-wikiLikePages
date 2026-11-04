@@ -840,6 +840,18 @@ html[data-file-protocol="true"] .protocol-warning {
   margin-right: 4px;
 }
 
+/* 本文の脚注番号 [1]。行の高さを変えずに上付きにする */
+.footnote-ref {
+  font-size: 0.75em;
+  line-height: 0;
+  vertical-align: super;
+}
+
+.footnote-ref a {
+  text-decoration: none;
+  white-space: nowrap;
+}
+
 .notice--main-article {
   background: var(--color-surface-soft);
   border-left-color: var(--color-link);

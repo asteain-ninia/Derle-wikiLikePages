@@ -327,18 +327,18 @@ function bindEvents() {
       return;
     }
 
-    const tocLink = event.target.closest(".toc__list a");
-    if (!tocLink) {
+    // ページ内の id へのリンク (目次の #section-…、脚注番号の #fn-…) は、ハッシュを変えると
+    // ルーティングがメインページへ戻ってしまうので、自分で移動する。
+    // 移動先が表示中のページの中にあるときだけ (パンくずの #overview はメインページへの移動のまま)
+    const inPageLink = event.target.closest('a[href^="#"]:not([href^="#!"])');
+    if (!inPageLink) {
       return;
     }
 
-    event.preventDefault();
-    const targetId = tocLink.getAttribute("href")?.slice(1);
-    if (targetId) {
-      const target = document.getElementById(targetId);
-      if (target) {
-        scrollToElement(target);
-      }
+    const target = document.getElementById(inPageLink.getAttribute("href").slice(1));
+    if (target && elements.detailView.contains(target)) {
+      event.preventDefault();
+      scrollToElement(target);
     }
   });
 }

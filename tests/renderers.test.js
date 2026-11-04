@@ -1006,6 +1006,42 @@ test("renderInlineMarkdown は '''''太字斜体''''' を正しく入れ子に�
   );
 });
 
+test("renderInlineMarkdown は脚注番号の印を脚注へ飛ぶ上付きのリンクにし、原稿の [1] は文字のままにする", () => {
+  assert.equal(
+    renderInlineMarkdown(escapeHtml("2015年1に始まり12。原稿の [1] は残す。")),
+    '2015年<sup class="footnote-ref" id="fnref-1"><a href="#fn-1">[1]</a></sup>に始まり' +
+      '<sup class="footnote-ref" id="fnref-12"><a href="#fn-12">[12]</a></sup>。原稿の [1] は残す。'
+  );
+});
+
+test("renderArticlePage は本文の脚注番号から脚注の一覧 (id が fn-N の項目) へリンクする", () => {
+  const rendered = renderArticlePage({
+    id: "lang",
+    title: "テスト語",
+    category: "記事",
+    created: "2026-03-10",
+    updated: "2026-03-15",
+    summary: "",
+    aliases: [],
+    tags: [],
+    unresolvedLinkCount: 0,
+    backlinks: [],
+    footnotes: [{ text: "出典A", segments: [{ type: "text", value: "出典A" }] }],
+    sections: [
+      {
+        heading: "概要",
+        anchorId: "section-概要",
+        paragraphs: [[{ type: "text", value: "2015年1に始まった。" }]],
+      },
+    ],
+    templateModels: [],
+    history: [],
+  });
+
+  assert.match(rendered, /<p>2015年<sup class="footnote-ref" id="fnref-1"><a href="#fn-1">\[1\]<\/a><\/sup>に始まった。<\/p>/);
+  assert.match(rendered, /<li id="fn-1"><span class="footnote__number">\[1\]<\/span> 出典A<\/li>/);
+});
+
 test("renderArticlePage renders ordered and nested mixed lists", () => {
   const item = (markers, value) => ({
     type: "list-item",
