@@ -225,3 +225,17 @@ test("buildBuildArtifacts は書き出すファイルを一式そろえる", () 
     }
   }
 });
+
+test("[[TODO]] へのリンクは未解決リンクにも行き止まりの注記にも数えない", () => {
+  const entries = [
+    entry("draft", "下書き", ["[[TODO]]、[[todo]]、[[未作成港]]"]),
+    entry("other", "別記事", ["[[下書き]]"]),
+  ];
+  const { files, maintenanceReport } = buildBuildArtifacts(entries, { generatedAt: "2026-03-03T00:00:00Z" });
+
+  assert.deepEqual(files["missing-pages.json"].map((page) => page.title), ["未作成港"]);
+  assert.equal(maintenanceReport.summary.missingPageCount, 1);
+  assert.deepEqual(maintenanceReport.deadEnds.find((row) => row.id === "draft").missingTitles, ["未作成港"]);
+  assert.equal(maintenanceReport.linkDensity.find((row) => row.id === "draft").missingCount, 1);
+  assert.match(files["maintenance-report.md"], /TODO へのリンクは数えない/);
+});

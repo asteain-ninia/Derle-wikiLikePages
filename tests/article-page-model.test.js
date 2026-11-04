@@ -544,3 +544,33 @@ test("buildArticlePageModel resolves wikilinks in blockquote body", () => {
   assert.ok(linkSegment, "blockquote should contain a resolved link segment");
   assert.equal(linkSegment.status, "resolved");
 });
+
+test("buildWikiTextSegments は [[#見出し]] を同じ記事の見出しへのリンクにし、前方一致の見出しにも合わせる", () => {
+  const current = {
+    id: "gods",
+    title: "神々",
+    sections: [
+      { heading: "概要", paragraphs: [] },
+      { heading: "バーミナ神（草の女神）", paragraphs: [] },
+    ],
+  };
+  const graph = buildWikiGraph([current]);
+
+  assert.deepEqual(buildWikiTextSegments("[[#概要|上へ]]", graph, current), [
+    { type: "link", status: "resolved", href: buildArticleHref("gods", "概要"), label: "上へ", title: "神々#概要" },
+  ]);
+  assert.deepEqual(buildWikiTextSegments("[[#バーミナ神]]", graph, current), [
+    {
+      type: "link",
+      status: "resolved",
+      href: buildArticleHref("gods", "バーミナ神（草の女神）"),
+      label: "バーミナ神",
+      title: "神々#バーミナ神",
+    },
+  ]);
+  // 描画中の記事が分からないときはリンクにせず文字だけ残す
+  assert.deepEqual(buildWikiTextSegments("[[#概要|上へ]]", graph), [{ type: "text", value: "上へ" }]);
+
+  const pageModel = buildArticlePageModel(graph, "gods");
+  assert.equal(pageModel.unresolvedLinkCount, 0);
+});

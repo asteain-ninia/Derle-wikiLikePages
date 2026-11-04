@@ -469,7 +469,23 @@ export function buildWikiGraph(entries) {
   };
 }
 
-export function buildWikiTextSegments(text, graph) {
+// [[記事#見出し]] の見出しを記事の節見出しに合わせる。完全一致が無ければ、その名前で始まる見出し
+// (例: 「バーミナ神」→「バーミナ神（草の女神）」) を使う。見つからなければ書かれたまま返す
+export function matchSectionHeading(entry, heading) {
+  if (!heading) {
+    return "";
+  }
+
+  const headings = (entry?.sections ?? []).map((section) => section.heading ?? "");
+  if (headings.includes(heading)) {
+    return heading;
+  }
+
+  return headings.find((candidate) => candidate.startsWith(heading)) ?? heading;
+}
+
+// currentEntry は本文を描画している記事。[[#見出し]] (同じ記事内の見出しへのリンク) の行き先に使う
+export function buildWikiTextSegments(text, graph, currentEntry = null) {
   const links = extractWikiLinks(text);
 
   if (links.length === 0) {
@@ -497,13 +513,30 @@ export function buildWikiTextSegments(text, graph) {
       continue;
     }
 
+    if (!link.pageTitle) {
+      const label = link.displayText || link.heading;
+      segments.push(
+        currentEntry && link.heading
+          ? {
+              type: "link",
+              status: "resolved",
+              href: buildArticleHref(currentEntry.id, matchSectionHeading(currentEntry, link.heading)),
+              label,
+              title: `${currentEntry.title}#${link.heading}`,
+            }
+          : { type: "text", value: label }
+      );
+      cursor = link.end;
+      continue;
+    }
+
     const resolution = resolveArticleReference(graph.referenceIndex, graph.entryById, link.pageTitle);
 
     if (resolution.type === "article") {
       segments.push({
         type: "link",
         status: "resolved",
-        href: buildArticleHref(resolution.entry.id, link.heading),
+        href: buildArticleHref(resolution.entry.id, matchSectionHeading(resolution.entry, link.heading)),
         label: buildReferenceLabel(link, resolution.entry.title),
         title: resolution.entry.title,
       });
@@ -549,7 +582,7 @@ export function buildArticlePageModel(graph, entryId) {
   const sections = (entry.sections ?? []).map((section) => {
     const paragraphs = (section.paragraphs ?? []).map((paragraph) => {
       if (typeof paragraph === "object" && paragraph.type === "callout") {
-        const bodySegments = buildWikiTextSegments(paragraph.body, graph);
+        const bodySegments = buildWikiTextSegments(paragraph.body, graph, entry);
         unresolvedLinkCount += bodySegments.filter(
           (segment) => segment.type === "link" && segment.status !== "resolved"
         ).length;
@@ -565,19 +598,19 @@ export function buildArticlePageModel(graph, entryId) {
         const resolvedRows = paragraph.rows.map((row) =>
           row.map((cell) => ({
             ...cell,
-            segments: buildWikiTextSegments(cell.text, graph),
+            segments: buildWikiTextSegments(cell.text, graph, entry),
           }))
         );
         return { ...paragraph, rows: resolvedRows };
       }
 
       if (typeof paragraph === "object" && paragraph.type === "blockquote") {
-        const bodySegments = buildWikiTextSegments(paragraph.body, graph);
+        const bodySegments = buildWikiTextSegments(paragraph.body, graph, entry);
         return { ...paragraph, bodySegments };
       }
 
       if (typeof paragraph === "object" && paragraph.type === "list-item") {
-        const bodySegments = buildWikiTextSegments(paragraph.body, graph);
+        const bodySegments = buildWikiTextSegments(paragraph.body, graph, entry);
         unresolvedLinkCount += bodySegments.filter(
           (segment) => segment.type === "link" && segment.status !== "resolved"
         ).length;
@@ -585,19 +618,19 @@ export function buildArticlePageModel(graph, entryId) {
       }
 
       if (typeof paragraph === "object" && paragraph.type === "main-article") {
-        const segments = buildWikiTextSegments(`[[${paragraph.articleName}]]`, graph);
+        const segments = buildWikiTextSegments(`[[${paragraph.articleName}]]`, graph, entry);
         return { ...paragraph, segments };
       }
 
       if (typeof paragraph === "object" && paragraph.type === "poem") {
-        const bodySegments = buildWikiTextSegments(paragraph.body, graph);
+        const bodySegments = buildWikiTextSegments(paragraph.body, graph, entry);
         return { ...paragraph, bodySegments };
       }
 
       if (typeof paragraph === "object" && paragraph.type === "definition-list") {
         const items = paragraph.items.map((item) => ({
-          termSegments: buildWikiTextSegments(item.term, graph),
-          descriptionSegments: buildWikiTextSegments(item.description, graph),
+          termSegments: buildWikiTextSegments(item.term, graph, entry),
+          descriptionSegments: buildWikiTextSegments(item.description, graph, entry),
         }));
         return { ...paragraph, items };
       }
@@ -607,7 +640,7 @@ export function buildArticlePageModel(graph, entryId) {
         return paragraph;
       }
 
-      const segments = buildWikiTextSegments(paragraph, graph);
+      const segments = buildWikiTextSegments(paragraph, graph, entry);
       unresolvedLinkCount += segments.filter(
         (segment) => segment.type === "link" && segment.status !== "resolved"
       ).length;
@@ -628,7 +661,7 @@ export function buildArticlePageModel(graph, entryId) {
         rows: model.rows.map((row) => ({
           label: row.label,
           value: row.value,
-          segments: buildWikiTextSegments(row.value, graph),
+          segments: buildWikiTextSegments(row.value, graph, entry),
         })),
       };
     }
@@ -642,7 +675,7 @@ export function buildArticlePageModel(graph, entryId) {
     tags: entry.tags ?? [],
     footnotes: (entry.footnotes ?? []).map((note) => ({
       text: note,
-      segments: buildWikiTextSegments(note, graph),
+      segments: buildWikiTextSegments(note, graph, entry),
     })),
     sections,
     templateModels,

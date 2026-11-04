@@ -249,9 +249,11 @@ UI に依存しない純粋なデータ変換・集計処理。Node の組み込
     - レーベンシュタイン距離による近似ページ提案
     - ハッシュルーティング解析 (`#!article/...`, `#!missing/...`, `#!disambiguation/...`)
     - 記事ごとの出リンク記録 (`outgoingLinksById`: 解決先の記事 ID・曖昧な名前・未作成の名前・リンク出現数)。`[[#見出し]]` は同じ記事内のリンクなので数えない
+    - `[[#見出し]]` は描画中の記事の見出しへのリンクにする。`[[記事#見出し]]` も含め、見出しが完全一致しなければその名前で始まる見出しへ飛ぶ (`matchSectionHeading`)
 - `src/lib/build-artifacts.js`
     - `buildWikiGraph` の結果からビルド成果物 (backlinks / missing-pages / redirects / disambiguation / history) と保守レポートを組み立てる。リンク解決は自前で持たない
     - 保守レポートの Markdown 描画
+    - `IGNORED_MISSING_TITLES` (いまは `TODO`) へのリンクは「あとで書く」の印なので、missing-pages.json と保守レポートの未解決リンクに数えない
 
 ### 3.7 View (`src/lib/renderers.js`)
 

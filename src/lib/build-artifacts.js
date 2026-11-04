@@ -12,6 +12,15 @@ function normalizeName(value) {
   return String(value).trim().toLocaleLowerCase("ja-JP");
 }
 
+// 「あとで書く」の印として使っているリンク先。記事を作る予定の名前ではないので、
+// 未解決リンク (missing-pages.json と保守レポート) には数えない。本文での表示は変えない
+export const IGNORED_MISSING_TITLES = ["TODO"];
+const ignoredMissingNames = new Set(IGNORED_MISSING_TITLES.map(normalizeName));
+
+function isIgnoredMissingTitle(title) {
+  return ignoredMissingNames.has(normalizeName(title));
+}
+
 function compareTitles(left, right) {
   return left.localeCompare(right, "ja-JP");
 }
@@ -42,6 +51,7 @@ export function buildBacklinksArtifact(graph) {
 // 未解決リンク (リンク先の記事が無い名前) の一覧。参照元が多い順
 export function buildMissingPagesArtifact(graph) {
   return Object.values(graph.missingPagesByTitle)
+    .filter((page) => !isIgnoredMissingTitle(page.title))
     .map((page) => ({
       title: page.title,
       referenceCount: page.sourceEntries.length,
@@ -173,6 +183,7 @@ export function buildMaintenanceReport(graph, { generatedAt = new Date().toISOSt
       (source) => source.id !== entry.id
     ).length;
     const textLength = measureTextLength(entry);
+    const missingTitles = outgoing.missingTitles.filter((title) => !isIgnoredMissingTitle(title));
 
     return {
       id: entry.id,
@@ -180,7 +191,7 @@ export function buildMaintenanceReport(graph, { generatedAt = new Date().toISOSt
       outgoingArticleCount,
       incomingCount,
       ambiguousCount: outgoing.ambiguousTitles.length,
-      missingCount: outgoing.missingTitles.length,
+      missingCount: missingTitles.length,
       linkCount: outgoing.linkCount,
       textLength,
       linksPer1000Chars: textLength > 0 ? roundTo((outgoing.linkCount / textLength) * 1000, 2) : 0,
@@ -197,7 +208,9 @@ export function buildMaintenanceReport(graph, { generatedAt = new Date().toISOSt
     .map((row) => ({
       id: row.id,
       title: row.title,
-      missingTitles: [...graph.outgoingLinksById[row.id].missingTitles].sort(compareTitles),
+      missingTitles: graph.outgoingLinksById[row.id].missingTitles
+        .filter((title) => !isIgnoredMissingTitle(title))
+        .sort(compareTitles),
     }));
 
   const articleCount = graph.entries.length;
@@ -286,7 +299,12 @@ export function renderMaintenanceReportMarkdown(report) {
     lines.push("");
   }
 
-  lines.push("## 未解決リンク", "", "リンク先の記事が無い名前。参照元が多い順。", "");
+  lines.push(
+    "## 未解決リンク",
+    "",
+    `リンク先の記事が無い名前。参照元が多い順。${IGNORED_MISSING_TITLES.join("・")} へのリンクは数えない。`,
+    ""
+  );
   if (report.missingPages.length === 0) {
     lines.push("なし", "");
   } else {
