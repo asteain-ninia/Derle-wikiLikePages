@@ -259,6 +259,11 @@ export function parseAppRoute(hash) {
     };
   }
 
+  // 保守レポート (build:content が書き出す maintenance-report.json を表示する)
+  if (view === "maintenance") {
+    return { view: "maintenance" };
+  }
+
   return { view: "home" };
 }
 

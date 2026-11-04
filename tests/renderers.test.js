@@ -11,6 +11,7 @@ import {
   renderFootnotes,
   renderInfobox,
   renderInlineMarkdown,
+  renderMaintenanceReportPage,
   renderMissingPage,
   renderNotFoundPage,
   renderNotice,
@@ -1066,4 +1067,47 @@ test("renderArticlePage wraps skipped list levels in an item instead of nesting 
     list,
     "<ul><li><ul><li>子</li></ul></li><li>親<ul><li><ul><li>孫</li></ul></li></ul></li><li>次</li></ul>"
   );
+});
+
+test("renderMaintenanceReportPage は保守レポートを記事と同じ見た目のページにし、記事や未作成の名前へリンクする", () => {
+  const rendered = renderMaintenanceReportPage({
+    generatedAt: "2026-11-05T00:00:00.000Z",
+    summary: {
+      articleCount: 2,
+      linkCount: 3,
+      articleLinkCount: 1,
+      averageOutgoingArticles: 0.5,
+      averageIncoming: 0.5,
+      missingPageCount: 1,
+      missingReferenceCount: 2,
+      ambiguousNameCount: 0,
+      orphanCount: 1,
+      deadEndCount: 1,
+    },
+    orphans: [{ id: "lonely", title: "孤島", outgoingArticleCount: 0 }],
+    deadEnds: [{ id: "lonely", title: "孤島", missingTitles: ["未作成港"] }],
+    missingPages: [{ title: "未作成港", referenceCount: 2, sourceEntries: [{ id: "lonely", title: "孤島" }] }],
+    ambiguousNames: [],
+    linkDensity: [
+      {
+        id: "lonely",
+        title: "孤島",
+        outgoingArticleCount: 0,
+        incomingCount: 0,
+        missingCount: 1,
+        ambiguousCount: 0,
+        linkCount: 1,
+        textLength: 10,
+        linksPer1000Chars: 100,
+      },
+    ],
+  });
+
+  assert.match(rendered, /<h2>保守レポート<\/h2>/);
+  // UTC 0 時は日本時間の 9 時
+  assert.match(rendered, /生成: 2026\.11\.05 09:00/);
+  assert.match(rendered, /<a href="#!article\/lonely">孤島<\/a>/);
+  assert.match(rendered, /wiki-link--missing" href="#!missing\/%E6%9C%AA%E4%BD%9C%E6%88%90%E6%B8%AF">未作成港<\/a>/);
+  assert.match(renderMaintenanceReportPage(null), /読み込めませんでした/);
+  assert.match(renderMaintenanceReportPage(null, { loading: true }), /読み込み中/);
 });

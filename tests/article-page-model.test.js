@@ -574,3 +574,7 @@ test("buildWikiTextSegments は [[#見出し]] を同じ記事の見出しへの
   const pageModel = buildArticlePageModel(graph, "gods");
   assert.equal(pageModel.unresolvedLinkCount, 0);
 });
+
+test("parseAppRoute は #!maintenance を保守レポートのページにする", () => {
+  assert.deepEqual(parseAppRoute("#!maintenance"), { view: "maintenance" });
+});

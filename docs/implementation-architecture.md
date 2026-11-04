@@ -253,6 +253,7 @@ UI に依存しない純粋なデータ変換・集計処理。Node の組み込
 - `src/lib/build-artifacts.js`
     - `buildWikiGraph` の結果からビルド成果物 (backlinks / missing-pages / redirects / disambiguation / history) と保守レポートを組み立てる。リンク解決は自前で持たない
     - 保守レポートの Markdown 描画
+    - サイトでは `renderers.js` の `renderMaintenanceReportPage` が `maintenance-report.json` を記事と同じ見た目で描画する (`#!maintenance`)
     - `IGNORED_MISSING_TITLES` (いまは `TODO`) へのリンクは「あとで書く」の印なので、missing-pages.json と保守レポートの未解決リンクに数えない
 
 ### 3.7 View (`src/lib/renderers.js`)

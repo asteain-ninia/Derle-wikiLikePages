@@ -890,3 +890,23 @@ html[data-file-protocol="true"] .protocol-warning {
     gap: 10px;
   }
 }
+
+/* 保守レポート */
+.article-page__body--full {
+  border-right: 0;
+}
+
+.report-table .is-numeric {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.site-maintenance-link {
+  margin: 24px 0 0;
+  text-align: right;
+  font-size: 0.82rem;
+}
+
+.site-maintenance-link a {
+  color: var(--color-text-muted);
+}

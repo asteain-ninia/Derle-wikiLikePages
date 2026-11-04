@@ -27,7 +27,7 @@ GitHub Pages で公開しつつ、Wikiライクな執筆体験は外部エディ
 - 既定の起動先は `http://localhost:4173` です。待ち受けはこの PC のみ (`127.0.0.1`) で、`HOST` / `PORT` 環境変数で変えられます
 - 開発サーバーは保管庫 (設定されていれば)・`content/`・`src/lib/templates/` を監視しており、原稿を保存すると自動で同期と `build:content` を実行してブラウザを再読み込みします
 - サーバーを使わずに原稿を画面データへ反映するには `npm run build:content` を実行します
-- `build:content` はリンクの解決結果 (`backlinks.json` / `missing-pages.json` / `redirects.json` / `disambiguation.json` / `history.json`) と保守レポート (`maintenance-report.md`: 孤立ページ・行き止まりページ・未解決リンク・リンク密度) も `src/data/generated/` に書き出し、件数を表示します
+- `build:content` はリンクの解決結果 (`backlinks.json` / `missing-pages.json` / `redirects.json` / `disambiguation.json` / `history.json`) と保守レポート (`maintenance-report.md`: 孤立ページ・行き止まりページ・未解決リンク・リンク密度) も `src/data/generated/` に書き出し、件数を表示します。保守レポートはサイトのメインページ下の「保守レポート」(`#!maintenance`) からも読めます
 - Pages に載せる公開物は `npm run build:site` で `dist/` へ出力します
 - 自動テストは `npm test` で実行できます
 
