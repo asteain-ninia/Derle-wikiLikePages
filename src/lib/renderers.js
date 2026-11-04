@@ -105,6 +105,8 @@ export function renderInlineMarkdown(escapedText) {
       hold(`<a href="${url}" class="external-link" rel="noopener noreferrer">${url}</a>`)
     )
     .replace(/\*\*\*(.+?)\*\*\*/g, "<strong><em>$1</em></strong>")
+    // MediaWiki の '''''太字斜体''''' は、''' と '' を別々に処理すると閉じタグの順が食い違うので先にまとめて扱う
+    .replace(/&#39;&#39;&#39;&#39;&#39;(.+?)&#39;&#39;&#39;&#39;&#39;/g, "<strong><em>$1</em></strong>")
     .replace(/&#39;&#39;&#39;(.+?)&#39;&#39;&#39;/g, "<strong>$1</strong>")
     .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
     .replace(/(^|[^\p{L}\p{N}_])__(.+?)__(?![\p{L}\p{N}_])/gu, "$1<strong>$2</strong>")

@@ -994,6 +994,18 @@ test("renderInlineMarkdown leaves non-URL square brackets alone", () => {
   assert.equal(renderInlineMarkdown(escapeHtml("[注] と [https://] と [ https://example.com ]")), "[注] と [https://] と [ https://example.com ]");
 });
 
+test("renderInlineMarkdown は '''''太字斜体''''' を正しく入れ子にする", () => {
+  assert.equal(
+    renderInlineMarkdown(escapeHtml("前 '''''太字斜体''''' 後")),
+    "前 <strong><em>太字斜体</em></strong> 後"
+  );
+  // 5 連の処理が ''' と '' の単独の処理を壊さない
+  assert.equal(
+    renderInlineMarkdown(escapeHtml("'''太字'''と''斜体''と'''''両方'''''")),
+    "<strong>太字</strong>と<em>斜体</em>と<strong><em>両方</em></strong>"
+  );
+});
+
 test("renderArticlePage renders ordered and nested mixed lists", () => {
   const item = (markers, value) => ({
     type: "list-item",
