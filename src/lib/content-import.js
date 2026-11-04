@@ -48,9 +48,8 @@ function sanitizeInlineHtml(text) {
 
 function stripInlineFormatting(text) {
   // 描画側 (renderInlineMarkdown) と同じく、単語内の _ は強調として扱わない
-  return text
-    // 脚注番号の印 (processFootnotes) は要約・検索用の平文では [N] の文字にする
-    .replace(/(\d+)/g, "[$1]")
+  // 脚注番号の印 (processFootnotes) は要約・検索用の平文では [N] の文字にする
+  return plainFootnoteMarks(text)
     .replace(/\[([^\]]+?)\]\(https?:\/\/[^)\s]+\)/g, "$1")
     // MediaWiki の外部リンク [URL ラベル] はラベル、[URL] は URL だけを残す
     .replace(/\[(https?:\/\/[^\s[\]<>"]+)(?:[ \t]+([^\]\n]+?))?[ \t]*\]/g, (_match, url, label) => label ?? url)
@@ -367,7 +366,8 @@ function parseCalloutLines(lines, startIndex) {
   }
 
   const calloutType = calloutMatch[1].toLowerCase();
-  const title = calloutMatch[2].trim();
+  // 題は描画で escapeHtml するだけなので、脚注番号の印は平文の [N] にしておく
+  const title = plainFootnoteMarks(calloutMatch[2].trim());
   const bodyLines = [];
   let endIndex = startIndex + 1;
 
@@ -652,6 +652,25 @@ function extractBlockquotes(text) {
 // 平文化 (stripInlineFormatting) では [N] の文字にする。原稿の [1] と区別するため私用領域の文字で挟む
 const FOOTNOTE_REF_OPEN = "";
 const FOOTNOTE_REF_CLOSE = "";
+const FOOTNOTE_MARK = /(\d+)/g;
+
+// 脚注番号の印を平文の [N] にする (要約・検索・callout の題など、描画で解釈しない場所用)
+function plainFootnoteMarks(text) {
+  return text.replace(FOOTNOTE_MARK, "[$1]");
+}
+
+// [[リンク]] や ![[画像]] の中に入った印は、リンク先の名前・表示文字・画像の説明に混ざらないよう
+// リンクの直後へ出す ([[B<ref>x</ref>]] → [[B]] + 印)。名前に印が残ると未解決リンクの一覧や
+// キーワードに漏れ、表示文字に残るとリンクの中にリンクができる
+function moveFootnoteMarksOutOfLinks(text) {
+  return text.replace(/(!?)\[\[([^[\]]*?)\]\]/g, (match, embedMark, token) => {
+    const marks = token.match(FOOTNOTE_MARK) ?? [];
+    if (marks.length === 0) {
+      return match;
+    }
+    return `${embedMark}[[${token.replace(FOOTNOTE_MARK, "")}]]${marks.join("")}`;
+  });
+}
 
 function processFootnotes(text) {
   const footnotes = [];
@@ -663,7 +682,7 @@ function processFootnotes(text) {
     footnotes.push(bodyMatch[1].trim());
     return `${FOOTNOTE_REF_OPEN}${footnotes.length}${FOOTNOTE_REF_CLOSE}`;
   });
-  const cleaned = processed.replace(/<references\s*\/>/gi, "");
+  const cleaned = moveFootnoteMarksOutOfLinks(processed.replace(/<references\s*\/>/gi, ""));
   return { text: cleaned, footnotes };
 }
 

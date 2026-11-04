@@ -72,6 +72,114 @@ function escapeAttributeQuotes(value) {
   return value.replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
+// 脚注番号の印 (content-import.js の processFootnotes が U+E018〜U+E019 で挟む)
+const FOOTNOTE_MARK = /(\d+)/g;
+
+// 印を平文の [N] にする (タグの属性値やリンクの表示文字など、リンクにできない場所用)
+function plainFootnoteMarks(text) {
+  return text.replace(FOOTNOTE_MARK, "[$1]");
+}
+
+const APOSTROPHE = "&#39;";
+const APOSTROPHE_RUN = /((?:&#39;){2,})/;
+
+// MediaWiki の '' (斜体) / ''' (太字) / ''''' (両方) を、MediaWiki の Parser::doQuotes と同じ手順で
+// 行ごとに字句単位で処理する。正規表現で前から組にすると、別の強調を閉じる ''''' を次の ''''' の
+// 開きと組にしてしまうため。入力はエスケープ済みなので、アポストロフィは &#39; で来る
+// - 4 個は「1 個の文字 + '''」、6 個以上は「余りの文字 + '''''」とみなす
+// - 太字と斜体の数がどちらも奇数なら ''' のどれか 1 つを「' + ''」に読み替えて対応を取る
+//   (1 文字の語の直後 → 語の直後 → 空白の直後 の順で選ぶ)
+// - 行末で開いたままの強調は閉じる
+function renderMediaWikiQuotes(text) {
+  return text
+    .split("\n")
+    .map((line) => (line.includes(APOSTROPHE + APOSTROPHE) ? renderQuoteLine(line) : line))
+    .join("\n");
+}
+
+function renderQuoteLine(line) {
+  // 偶数番目が文字列、奇数番目がアポストロフィの並び
+  const parts = line.split(APOSTROPHE_RUN);
+  const counts = parts.map((part, index) => (index % 2 === 1 ? part.length / APOSTROPHE.length : 0));
+
+  let boldCount = 0;
+  let italicCount = 0;
+  for (let index = 1; index < parts.length; index += 2) {
+    if (counts[index] === 4) {
+      parts[index - 1] += APOSTROPHE;
+      counts[index] = 3;
+    } else if (counts[index] > 5) {
+      parts[index - 1] += APOSTROPHE.repeat(counts[index] - 5);
+      counts[index] = 5;
+    }
+    if (counts[index] !== 3) italicCount += 1;
+    if (counts[index] !== 2) boldCount += 1;
+  }
+
+  if (boldCount % 2 === 1 && italicCount % 2 === 1) {
+    let firstSingleLetter = -1;
+    let firstMultiLetter = -1;
+    let firstSpace = -1;
+    for (let index = 1; index < parts.length; index += 2) {
+      if (counts[index] !== 3) continue;
+      const before = parts[index - 1];
+      if (before.slice(-1) === " ") {
+        if (firstSpace === -1) firstSpace = index;
+      } else if (before.slice(-2, -1) === " ") {
+        firstSingleLetter = index;
+        break;
+      } else if (firstMultiLetter === -1) {
+        firstMultiLetter = index;
+      }
+    }
+    const chosen = [firstSingleLetter, firstMultiLetter, firstSpace].find((index) => index !== -1);
+    if (chosen !== undefined) {
+      parts[chosen - 1] += APOSTROPHE;
+      counts[chosen] = 2;
+    }
+  }
+
+  // state: "" / i / b / bi (太字の中の斜体) / ib (斜体の中の太字) / both (''''' を見たが順が未定)
+  let state = "";
+  let output = "";
+  let buffer = "";
+  for (let index = 0; index < parts.length; index += 1) {
+    if (index % 2 === 0) {
+      if (state === "both") buffer += parts[index];
+      else output += parts[index];
+      continue;
+    }
+    const count = counts[index];
+    if (count === 2) {
+      if (state === "i") { output += "</em>"; state = ""; }
+      else if (state === "bi") { output += "</em>"; state = "b"; }
+      else if (state === "ib") { output += "</strong></em><strong>"; state = "b"; }
+      // ''''' のあとの '' は斜体の側を閉じる (太字が続く)
+      else if (state === "both") { output += `<strong><em>${buffer}</em>`; state = "b"; }
+      else { output += "<em>"; state += "i"; }
+    } else if (count === 3) {
+      if (state === "b") { output += "</strong>"; state = ""; }
+      else if (state === "bi") { output += "</em></strong><em>"; state = "i"; }
+      else if (state === "ib") { output += "</strong>"; state = "i"; }
+      // ''''' のあとの ''' は太字の側を閉じる (斜体が続く)
+      else if (state === "both") { output += `<em><strong>${buffer}</strong>`; state = "i"; }
+      else { output += "<strong>"; state += "b"; }
+    } else {
+      if (state === "b") { output += "</strong><em>"; state = "i"; }
+      else if (state === "i") { output += "</em><strong>"; state = "b"; }
+      else if (state === "bi") { output += "</em></strong>"; state = ""; }
+      else if (state === "ib") { output += "</strong></em>"; state = ""; }
+      else if (state === "both") { output += `<em><strong>${buffer}</strong></em>`; state = ""; }
+      else { buffer = ""; state = "both"; }
+    }
+  }
+  if (state === "b" || state === "ib") output += "</strong>";
+  if (state === "i" || state === "bi" || state === "ib") output += "</em>";
+  if (state === "bi") output += "</strong>";
+  if (state === "both" && buffer) output += `<strong><em>${buffer}</em></strong>`;
+  return output;
+}
+
 export function renderInlineMarkdown(escapedText) {
   const heldParts = [];
   const hold = (html) => {
@@ -81,9 +189,14 @@ export function renderInlineMarkdown(escapedText) {
 
   // 入力はエスケープ済みなので、ここにある < はすべて生成済みのタグ (<a>, <img> など)。
   // 属性値・コード・URL を書式変換の対象から外すため、先に退避してから強調記法を処理する。
-  const formatted = escapedText
+  // 脚注番号の印は、タグの属性値の中なら平文の [N] に、本文なら脚注の一覧 (renderFootnotes の
+  // id="fn-N") へ飛ぶ上付きのリンクにして、同じように退避する (URL や強調の中に混ざらない)
+  const withHeldParts = escapedText
     .replace(PLACEHOLDER_DELIMITERS, "")
-    .replace(/<[^>]*>/g, (tag) => hold(tag))
+    .replace(/<[^>]*>/g, (tag) => hold(plainFootnoteMarks(tag)))
+    .replace(FOOTNOTE_MARK, (_match, number) =>
+      hold(`<sup class="footnote-ref" id="fnref-${number}"><a href="#fn-${number}">[${number}]</a></sup>`)
+    )
     .replace(/`([^`\n]+?)`/g, (_match, code) => hold(`<code class="inline-code">${code}</code>`))
     .replace(
       /\[([^\]]+?)\]\((https?:\/\/[^)\s]+)\)/g,
@@ -104,13 +217,12 @@ export function renderInlineMarkdown(escapedText) {
     .replace(/&lt;(https?:\/\/[^\s&]+?)&gt;/g, (_match, url) =>
       hold(`<a href="${url}" class="external-link" rel="noopener noreferrer">${url}</a>`)
     )
-    .replace(/\*\*\*(.+?)\*\*\*/g, "<strong><em>$1</em></strong>")
-    // MediaWiki の '''''太字斜体''''' は、''' と '' を別々に処理すると閉じタグの順が食い違うので先にまとめて扱う
-    .replace(/&#39;&#39;&#39;&#39;&#39;(.+?)&#39;&#39;&#39;&#39;&#39;/g, "<strong><em>$1</em></strong>")
-    .replace(/&#39;&#39;&#39;(.+?)&#39;&#39;&#39;/g, "<strong>$1</strong>")
+    .replace(/\*\*\*(.+?)\*\*\*/g, "<strong><em>$1</em></strong>");
+
+  // MediaWiki の '' / ''' / ''''' は字句単位で対応を取る (renderMediaWikiQuotes)
+  const formatted = renderMediaWikiQuotes(withHeldParts)
     .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
     .replace(/(^|[^\p{L}\p{N}_])__(.+?)__(?![\p{L}\p{N}_])/gu, "$1<strong>$2</strong>")
-    .replace(/&#39;&#39;(.+?)&#39;&#39;/g, "<em>$1</em>")
     .replace(/\*([^*\n]+?)\*/g, "<em>$1</em>")
     .replace(/(^|[^\p{L}\p{N}_])_([^_\n]+?)_(?![\p{L}\p{N}_])/gu, "$1<em>$2</em>");
 
@@ -118,12 +230,6 @@ export function renderInlineMarkdown(escapedText) {
     .replace(/&lt;(small|sup|sub)&gt;/gi, "<$1>")
     .replace(/&lt;\/(small|sup|sub)&gt;/gi, "</$1>")
     .replace(/&lt;br\s*\/?&gt;/gi, "<br>")
-    // 脚注番号の印 (content-import.js の processFootnotes が U+E018〜U+E019 で挟む) を、
-    // 脚注の一覧 (renderFootnotes の id="fn-N") へ飛ぶ上付きのリンクにする
-    .replace(
-      /(\d+)/g,
-      (_match, number) => `<sup class="footnote-ref" id="fnref-${number}"><a href="#fn-${number}">[${number}]</a></sup>`
-    )
     .replace(/\uE010/g, "[")
     .replace(/\uE011/g, "]")
     .replace(/\uE012/g, "{")
@@ -145,8 +251,10 @@ function renderParagraphSegments(segments) {
         return escapeHtml(segment.value);
       }
 
+      // 画像の説明やリンクの表示文字に脚注番号の印が残っていても、属性値やリンクの中にリンクを
+      // 作らず平文の [N] にする (取り込みがリンクの外へ出すので、ふつうはここには来ない)
       if (segment.type === "embed") {
-        return renderImageTag(segment.src, segment.alt, "embed-image");
+        return renderImageTag(segment.src, plainFootnoteMarks(segment.alt), "embed-image");
       }
 
       const classNames = ["wiki-link"];
@@ -156,7 +264,7 @@ function renderParagraphSegments(segments) {
         classNames.push("wiki-link--ambiguous");
       }
 
-      return `<a class="${classNames.join(" ")}" href="${escapeHtml(segment.href)}">${escapeHtml(segment.label)}</a>`;
+      return `<a class="${classNames.join(" ")}" href="${escapeHtml(segment.href)}">${escapeHtml(plainFootnoteMarks(segment.label))}</a>`;
     })
     .join("");
 

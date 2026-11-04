@@ -328,16 +328,20 @@ function bindEvents() {
     }
 
     // ページ内の id へのリンク (目次の #section-…、脚注番号の #fn-…) は、ハッシュを変えると
-    // ルーティングがメインページへ戻ってしまうので、自分で移動する。
-    // 移動先が表示中のページの中にあるときだけ (パンくずの #overview はメインページへの移動のまま)
+    // ルーティングがメインページへ戻ってしまうので、自分で移動する。移動先が無ければ何もしない。
+    // 移動先がメインページ側の要素 (パンくずの #overview) なら、これまでどおりブラウザに任せる
     const inPageLink = event.target.closest('a[href^="#"]:not([href^="#!"])');
     if (!inPageLink) {
       return;
     }
 
     const target = document.getElementById(inPageLink.getAttribute("href").slice(1));
-    if (target && elements.detailView.contains(target)) {
-      event.preventDefault();
+    if (target && !elements.detailView.contains(target)) {
+      return;
+    }
+
+    event.preventDefault();
+    if (target) {
       scrollToElement(target);
     }
   });

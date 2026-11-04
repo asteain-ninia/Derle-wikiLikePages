@@ -997,13 +997,93 @@ test("renderInlineMarkdown leaves non-URL square brackets alone", () => {
 test("renderInlineMarkdown は '''''太字斜体''''' を正しく入れ子にする", () => {
   assert.equal(
     renderInlineMarkdown(escapeHtml("前 '''''太字斜体''''' 後")),
-    "前 <strong><em>太字斜体</em></strong> 後"
+    "前 <em><strong>太字斜体</strong></em> 後"
   );
   // 5 連の処理が ''' と '' の単独の処理を壊さない
   assert.equal(
     renderInlineMarkdown(escapeHtml("'''太字'''と''斜体''と'''''両方'''''")),
-    "<strong>太字</strong>と<em>斜体</em>と<strong><em>両方</em></strong>"
+    "<strong>太字</strong>と<em>斜体</em>と<em><strong>両方</strong></em>"
   );
+});
+
+test("renderInlineMarkdown は MediaWiki の引用符を字句単位で処理し、別の強調を閉じる ''''' を開きと組にしない", () => {
+  // 期待値は MediaWiki (Parser::doQuotes) と同じ。どの入力も main の正規表現より見た目が悪くならない
+  const cases = [
+    // 別の強調を閉じる ''''' の直後の文が太字斜体になり、c がならない退行があった
+    ["''a '''b''''' と '''''c'''''", "<em>a <strong>b</strong></em> と <em><strong>c</strong></em>"],
+    ["'''a ''b''''' と '''''c'''''", "<strong>a <em>b</em></strong> と <em><strong>c</strong></em>"],
+    // ''''' のあとの ''' は太字の側だけ閉じ、斜体が続く
+    ["'''''a''' b'' と '''''c'''''", "<em><strong>a</strong> b</em> と <em><strong>c</strong></em>"],
+    ["'''''a'' b''' と c", "<strong><em>a</em> b</strong> と c"],
+    // 太字の中の斜体、斜体の中の太字
+    ["'''太 ''斜'' 字'''", "<strong>太 <em>斜</em> 字</strong>"],
+    ["''斜 '''太''' 体''", "<em>斜 <strong>太</strong> 体</em>"],
+    // 4 個は「' + '''」、6 個は「' + '''''」
+    ["''''a''''", "&#39;<strong>a&#39;</strong>"],
+    ["''''''a''''''", "&#39;<em><strong>a&#39;</strong></em>"],
+    // 太字も斜体も奇数なら ''' を「' + ''」に読み替える (MediaWiki の対応付け)
+    ["''a'''", "<em>a&#39;</em>"],
+    // 行末で開いたままの強調は閉じる (main は文字のまま。太字にする方が書き手の意図に近い)
+    ["'''開いたまま", "<strong>開いたまま</strong>"],
+    // 行ごとに処理する (表のセルなど)
+    ["'''a'''\n''b''", "<strong>a</strong>\n<em>b</em>"],
+    // 単独のアポストロフィと退避した断片はそのまま
+    ["it's '''bold''' `'''code'''`", "it&#39;s <strong>bold</strong> <code class=\"inline-code\">&#39;&#39;&#39;code&#39;&#39;&#39;</code>"],
+  ];
+  for (const [input, expected] of cases) {
+    assert.equal(renderInlineMarkdown(escapeHtml(input)), expected, input);
+  }
+});
+
+test("renderInlineMarkdown は脚注番号の印をタグの属性値や URL の中では平文の [N] にし、リンクを壊さない", () => {
+  // img の alt の中 (生成済みタグの属性値)
+  assert.equal(
+    renderInlineMarkdown('<img src="x.png" alt="説明1">本文2'),
+    '<img src="x.png" alt="説明[1]">本文<sup class="footnote-ref" id="fnref-2"><a href="#fn-2">[2]</a></sup>'
+  );
+  // 外部リンクの URL の中には入らない (リンクにはならず、文字と上付きの番号になる)
+  const rendered = renderInlineMarkdown(escapeHtml("[https://example.com/1 外部]"));
+  assert.doesNotMatch(rendered, /href="[^"]*(?:|fn-1"[^>]*>\[1\]<\/a><\/sup>[^"]*)"/);
+  assert.match(rendered, /^\[https:\/\/example\.com\/<sup class="footnote-ref" id="fnref-1"><a href="#fn-1">\[1\]<\/a><\/sup> 外部\]$/);
+  // 強調の中でも番号のリンクが生きる
+  assert.equal(
+    renderInlineMarkdown(escapeHtml("'''太字1'''")),
+    '<strong>太字<sup class="footnote-ref" id="fnref-1"><a href="#fn-1">[1]</a></sup></strong>'
+  );
+});
+
+test("renderArticlePage はリンクの表示文字や画像の説明に残った脚注番号の印を平文の [N] にする", () => {
+  const rendered = renderArticlePage({
+    id: "t",
+    title: "テスト",
+    category: "記事",
+    created: "2026-03-10",
+    updated: "2026-03-15",
+    summary: "",
+    aliases: [],
+    tags: [],
+    unresolvedLinkCount: 0,
+    backlinks: [],
+    footnotes: [],
+    sections: [
+      {
+        heading: "概要",
+        anchorId: "section-概要",
+        paragraphs: [
+          [
+            { type: "link", status: "resolved", href: "#!article/a", label: "ラベル1", title: "A" },
+            { type: "embed", src: "x.png", alt: "説明2" },
+          ],
+        ],
+      },
+    ],
+    templateModels: [],
+    history: [],
+  });
+
+  assert.match(rendered, /<a class="wiki-link" href="#!article\/a">ラベル\[1\]<\/a>/);
+  assert.match(rendered, /<img class="embed-image" src="content\/x\.png" alt="説明\[2\]"/);
+  assert.doesNotMatch(rendered, //);
 });
 
 test("renderInlineMarkdown は脚注番号の印を脚注へ飛ぶ上付きのリンクにし、原稿の [1] は文字のままにする", () => {

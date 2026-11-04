@@ -784,3 +784,33 @@ test("buildArticleRecord は脚注番号を印 (U+E018 番号 U+E019) で本文�
   );
   assert.equal(article.summary, "2015年[1]に始まり、翌年[2]に終わった。原稿の [1] は残す。");
 });
+
+test("buildArticleRecord は [[リンク]] や ![[画像]] の中の <ref> をリンクの直後の脚注番号にし、callout の題では [N] にする", () => {
+  const article = buildArticleRecord({
+    relativePath: "test.md",
+    fileBasename: "テスト",
+    created: "2026-03-20",
+    updated: "2026-03-23",
+    sourceText: [
+      "[[B<ref>x</ref>]]と[[A|ラベル<ref>y</ref>]]と![[x.png|説明<ref>z</ref>]]。",
+      "",
+      "> [!note] 題<ref>w</ref>",
+      "> 本文",
+    ].join("\n"),
+  });
+
+  assert.deepEqual(article.footnotes, ["x", "y", "z", "w"]);
+  // 印はリンクの外に出るので、リンク先の名前・表示文字・画像の説明には混ざらない
+  assert.equal(
+    article.sections[0].paragraphs[0],
+    "[[B]]1と[[A|ラベル]]2と![[x.png|説明]]3。"
+  );
+  // 関連記事名・キーワードに印が漏れない (B や A が「B印」にならない)
+  assert.deepEqual(article.relatedTitles.slice(0, 2), ["B", "A"]);
+  for (const value of [...article.relatedTitles, ...article.keywords]) {
+    assert.ok(!value.includes("") && !value.includes("["), value);
+  }
+  // callout の題は描画で解釈しないので平文の [N]
+  const callout = article.sections[0].paragraphs.find((paragraph) => paragraph.type === "callout");
+  assert.equal(callout.title, "題[4]");
+});
