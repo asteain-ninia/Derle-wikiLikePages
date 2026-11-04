@@ -9,6 +9,7 @@ import {
   checkPublication,
 } from "../src/lib/content-import.js";
 import { loadTemplateHandlers } from "../src/lib/template-registry.js";
+import { buildBuildArtifacts } from "../src/lib/build-artifacts.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -212,6 +213,20 @@ const contentData = await buildContentData();
 await mkdir(generatedDataDir, { recursive: true });
 await writeFile(generatedDataPath, serializeModule(contentData), "utf8");
 
+// リンク解決結果のビルド成果物 (backlinks.json など) と管理者向け保守レポートを同じ場所に書き出す。
+// src/ ごと dist/ にコピーされるので、公開サイトでも src/data/generated/*.json として読める
+const { files: artifactFiles, maintenanceReport } = buildBuildArtifacts(contentData.generatedArticles, {
+  generatedAt: contentData.contentBuildInfo.generatedAt,
+});
+for (const [fileName, content] of Object.entries(artifactFiles)) {
+  const serialized = typeof content === "string" ? content : `${JSON.stringify(content, null, 2)}\n`;
+  await writeFile(path.join(generatedDataDir, fileName), serialized, "utf8");
+}
+
 console.log(
   `Generated ${contentData.generatedArticles.length} article records at ${path.relative(projectRoot, generatedDataPath)}`
+);
+const { summary } = maintenanceReport;
+console.log(
+  `保守レポート: 未解決リンク ${summary.missingPageCount} 件 (${summary.missingReferenceCount} 箇所) / 孤立 ${summary.orphanCount} / 行き止まり ${summary.deadEndCount} / 曖昧 ${summary.ambiguousNameCount} → ${toPosixPath(path.relative(projectRoot, path.join(generatedDataDir, "maintenance-report.md")))}`
 );

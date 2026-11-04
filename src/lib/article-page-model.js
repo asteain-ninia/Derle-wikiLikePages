@@ -47,7 +47,7 @@ export function collectTextsFromParagraph(paragraph) {
   return texts;
 }
 
-function collectAllTextsFromEntry(entry) {
+export function collectAllTextsFromEntry(entry) {
   const texts = [];
 
   for (const section of entry.sections ?? []) {
@@ -350,6 +350,14 @@ export function buildWikiGraph(entries) {
   const backlinkMapsById = new Map(entries.map((entry) => [entry.id, new Map()]));
   const missingPagesByTitle = new Map();
   const disambiguationPagesByTitle = new Map();
+  // 記事ごとの出リンク (保守レポート・ビルド成果物用)。リンク先は重複を除いて記録し、
+  // linkCount だけは本文中の出現回数を数える
+  const outgoingById = new Map(
+    entries.map((entry) => [
+      entry.id,
+      { articles: new Set(), ambiguous: new Set(), missing: new Set(), linkCount: 0 },
+    ])
+  );
 
   function registerMissingTitle(referenceTitle, sourceEntry) {
     const page = missingPagesByTitle.get(referenceTitle) ?? {
@@ -373,26 +381,33 @@ export function buildWikiGraph(entries) {
   }
 
   for (const entry of entries) {
+    const outgoing = outgoingById.get(entry.id);
+
     for (const text of collectAllTextsFromEntry(entry)) {
       for (const link of extractWikiLinks(text)) {
-        if (link.isEmbed) {
+        // [[#見出し]] は同じ記事内の見出しへのリンクなので、記事間のリンクとしては数えない
+        if (link.isEmbed || !link.pageTitle) {
           continue;
         }
 
+        outgoing.linkCount += 1;
         const resolution = resolveArticleReference(referenceIndex, entryById, link.pageTitle);
 
         if (resolution.type === "article") {
           const backlinks = backlinkMapsById.get(resolution.entry.id);
           backlinks?.set(entry.id, createEntrySummary(entry));
+          outgoing.articles.add(resolution.entry.id);
           continue;
         }
 
         if (resolution.type === "ambiguous") {
           registerDisambiguationTitle(link.pageTitle, resolution.candidates, entry);
+          outgoing.ambiguous.add(link.pageTitle);
           continue;
         }
 
         registerMissingTitle(link.pageTitle, entry);
+        outgoing.missing.add(link.pageTitle);
       }
     }
   }
@@ -429,11 +444,26 @@ export function buildWikiGraph(entries) {
     })
   );
 
+  const outgoingLinksById = Object.fromEntries(
+    [...outgoingById.entries()].map(([entryId, outgoing]) => {
+      return [
+        entryId,
+        {
+          articleIds: [...outgoing.articles],
+          ambiguousTitles: [...outgoing.ambiguous],
+          missingTitles: [...outgoing.missing],
+          linkCount: outgoing.linkCount,
+        },
+      ];
+    })
+  );
+
   return {
     entries,
     entryById,
     referenceIndex,
     backlinksById,
+    outgoingLinksById,
     missingPagesByTitle: finalizedMissingPages,
     disambiguationPagesByTitle: finalizedDisambiguationPages,
   };
