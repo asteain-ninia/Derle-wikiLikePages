@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { summarizeArticleHistory, toHistoryMessage } from "../src/lib/article-history.js";
+import { buildCommitBaseUrl, summarizeArticleHistory, toHistoryMessage } from "../src/lib/article-history.js";
 
 test("toHistoryMessage は wiki: のコミットだけを載せ、接頭辞を外す", () => {
   assert.equal(toHistoryMessage({ date: "2026-11-05", message: "wiki: 脱字の修正" }), "脱字の修正");
@@ -45,4 +45,26 @@ test("summarizeArticleHistory は履歴に載るコミットが無ければ更�
     history: [],
   });
   assert.equal(summarizeArticleHistory([]), null);
+});
+
+test("buildCommitBaseUrl は remote.origin.url の https / ssh の形からコミットのページの URL の頭を作る", () => {
+  const expected = "https://github.com/asteain-ninia/Derle-wikiLikePages/commit";
+  assert.equal(buildCommitBaseUrl("https://github.com/asteain-ninia/Derle-wikiLikePages.git\n"), expected);
+  assert.equal(buildCommitBaseUrl("https://github.com/asteain-ninia/Derle-wikiLikePages"), expected);
+  assert.equal(buildCommitBaseUrl("https://x-access-token:abc@github.com/asteain-ninia/Derle-wikiLikePages"), expected);
+  assert.equal(buildCommitBaseUrl("git@github.com:asteain-ninia/Derle-wikiLikePages.git"), expected);
+  assert.equal(buildCommitBaseUrl("ssh://git@github.com/asteain-ninia/Derle-wikiLikePages.git"), expected);
+  assert.equal(buildCommitBaseUrl(""), null);
+  assert.equal(buildCommitBaseUrl("/local/path/repo"), null);
+});
+
+test("summarizeArticleHistory は commitBaseUrl があれば履歴の各項目にコミットのページの URL を付ける", () => {
+  const commits = [
+    { hash: "aaa111", date: "2026-11-02", message: "feat: コードの作業" },
+    { hash: "bbb222", date: "2026-11-01", message: "wiki: 脱字の修正" },
+  ];
+  assert.deepEqual(summarizeArticleHistory(commits, { commitBaseUrl: "https://github.com/o/r/commit" }).history, [
+    { date: "2026-11-01", message: "脱字の修正", url: "https://github.com/o/r/commit/bbb222" },
+  ]);
+  assert.deepEqual(summarizeArticleHistory(commits).history, [{ date: "2026-11-01", message: "脱字の修正" }]);
 });

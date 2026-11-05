@@ -28,17 +28,33 @@ export function toHistoryMessage({ date, message }) {
   return null;
 }
 
-// commits は新しい順の { date, message }。
-// - history: 履歴に載るコミット (文言は接頭辞を外したもの)
+// git の remote.origin.url から、GitHub などのコミットのページの URL の頭 (…/commit) を作る。
+// 作れない形なら null
+export function buildCommitBaseUrl(remoteUrl) {
+  const url = String(remoteUrl ?? "").trim();
+  const match =
+    /^git@([^:/]+):(.+?)(?:\.git)?\/?$/.exec(url) ??
+    /^(?:ssh:\/\/git@|https?:\/\/(?:[^@/]+@)?)([^/:]+)(?::\d+)?\/(.+?)(?:\.git)?\/?$/.exec(url);
+  return match ? `https://${match[1]}/${match[2]}/commit` : null;
+}
+
+// commits は新しい順の { date, message, hash }。
+// - history: 履歴に載るコミット (文言は接頭辞を外したもの)。commitBaseUrl があれば url にコミットのページ
 // - created: いちばん古いコミットの日付 (載らないコミットも含めた全体から取る)
 // - updated: 履歴に載るコミットの最新の日付。1 件も無ければ作成日
-export function summarizeArticleHistory(commits) {
+export function summarizeArticleHistory(commits, { commitBaseUrl = null } = {}) {
   if (!commits || commits.length === 0) {
     return null;
   }
 
   const history = commits
-    .map((commit) => ({ date: commit.date, message: toHistoryMessage(commit) }))
+    .map((commit) => {
+      const entry = { date: commit.date, message: toHistoryMessage(commit) };
+      if (commitBaseUrl && commit.hash) {
+        entry.url = `${commitBaseUrl}/${commit.hash}`;
+      }
+      return entry;
+    })
     .filter((commit) => commit.message !== null);
   const created = commits[commits.length - 1].date;
 

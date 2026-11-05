@@ -407,7 +407,9 @@ export function renderFootnotes(footnotes) {
       const body = note.segments
         ? renderParagraphSegments(note.segments)
         : renderInlineMarkdown(escapeHtml(note));
-      return `<li id="fn-${index + 1}"><span class="footnote__number">[${index + 1}]</span> ${body}</li>`;
+      const number = index + 1;
+      // ↩ は本文の番号 (id="fnref-N") へ戻る。本文に番号が無い脚注は linkFootnoteRefs が外す
+      return `<li id="fn-${number}"><span class="footnote__number">[${number}]</span> ${body} <a class="footnote__backref" href="#fnref-${number}" aria-label="本文へ戻る">↩</a></li>`;
     })
     .join("");
 
@@ -568,10 +570,13 @@ function renderTableOfContents(sections) {
       .join("");
   const items = renderItems(root.children);
 
+  // 「目次」を押すと畳める。最初は開いておく (Wikipedia と同じ)
   return `
     <nav class="toc" aria-labelledby="toc-heading">
-      <h3 id="toc-heading">目次</h3>
-      <ol class="toc__list">${items}</ol>
+      <details class="toc__details" open>
+        <summary id="toc-heading" class="toc__title">目次</summary>
+        <ol class="toc__list">${items}</ol>
+      </details>
     </nav>
   `;
 }
@@ -755,13 +760,16 @@ function renderHistory(history) {
   return `
     <ul class="history-list">
       ${history
-        .map(
-          (entry) =>
-            `<li>
+        .map((entry) => {
+          // 文言は GitHub のそのコミット (差分) へのリンクにする。URL が作れなかったときは文字だけ
+          const message = entry.url
+            ? `<a class="history-message" href="${escapeHtml(entry.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(entry.message)}</a>`
+            : `<span class="history-message">${escapeHtml(entry.message)}</span>`;
+          return `<li>
               <span class="history-date">${escapeHtml(formatDisplayDate(entry.date))}</span>
-              <span class="history-message">${escapeHtml(entry.message)}</span>
-            </li>`
-        )
+              ${message}
+            </li>`;
+        })
         .join("")}
     </ul>
   `;
@@ -776,8 +784,9 @@ function renderPermalink(entryId) {
   return ` / <a class="article-page__permalink" href="${escapeHtml(buildStaticArticleHref(entryId))}" title="この記事を共有するときの URL">固定リンク</a>`;
 }
 
+// 目次は本文の列の中に置き、横の欄 (インフォボックスなど) を記事の頭から伸ばす
 export function renderArticlePage(pageModel) {
-  return `
+  return linkFootnoteRefs(`
     <article class="article-page">
       <nav class="breadcrumbs" aria-label="パンくず">
         <a href="#overview">メインページ</a>
@@ -798,10 +807,9 @@ export function renderArticlePage(pageModel) {
 
       ${renderNotices(pageModel.templateModels)}
 
-      ${renderTableOfContents(pageModel.sections)}
-
       <div class="article-page__layout">
         <div class="article-page__body">
+          ${renderTableOfContents(pageModel.sections)}
           ${pageModel.sections
             .map((section) => {
               // ## (深さ 2) を h3 にし、### 以下は h4〜h6。記事名が h2 なので 1 段ずらす
@@ -861,7 +869,24 @@ export function renderArticlePage(pageModel) {
         </aside>
       </div>
     </article>
-  `;
+  `);
+}
+
+// 名前付きの脚注は同じ番号が本文に何度も出るので、戻り先の id="fnref-N" は最初の 1 つだけに残す
+// (MediaWiki も ↩ は最初の参照へ戻る)。本文に番号が 1 つも無い脚注 (callout の題の中だけ、など) は ↩ を外す
+function linkFootnoteRefs(html) {
+  const seen = new Set();
+  return html
+    .replace(/ id="fnref-(\d+)"/g, (attribute, number) => {
+      if (seen.has(number)) {
+        return "";
+      }
+      seen.add(number);
+      return attribute;
+    })
+    .replace(/ <a class="footnote__backref" href="#fnref-(\d+)"[^>]*>↩<\/a>/g, (link, number) =>
+      seen.has(number) ? link : ""
+    );
 }
 
 export function renderMissingPage(pageModel) {
