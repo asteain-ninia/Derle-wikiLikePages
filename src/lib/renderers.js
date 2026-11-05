@@ -3,6 +3,7 @@ import {
   buildArticleHref,
   buildDisambiguationHref,
   buildMissingPageHref,
+  buildStaticArticleHref,
 } from "./article-page-model.js";
 
 export function escapeHtml(value) {
@@ -766,6 +767,15 @@ function renderHistory(history) {
   `;
 }
 
+// 記事の静的ページ (wiki/…/) へのリンク。共有するとき (SNS のカードや検索エンジン) はこちらの URL を使う
+function renderPermalink(entryId) {
+  if (!entryId) {
+    return "";
+  }
+
+  return ` / <a class="article-page__permalink" href="${escapeHtml(buildStaticArticleHref(entryId))}" title="この記事を共有するときの URL">固定リンク</a>`;
+}
+
 export function renderArticlePage(pageModel) {
   return `
     <article class="article-page">
@@ -782,7 +792,7 @@ export function renderArticlePage(pageModel) {
         <h2>${escapeHtml(pageModel.title)}</h2>
         <p class="article-page__summary">${escapeHtml(pageModel.summary)}</p>
         <p class="entry-meta">
-          作成 ${escapeHtml(formatDisplayDate(pageModel.created))} / 更新 ${escapeHtml(formatDisplayDate(pageModel.updated))}
+          作成 ${escapeHtml(formatDisplayDate(pageModel.created))} / 更新 ${escapeHtml(formatDisplayDate(pageModel.updated))}${renderPermalink(pageModel.id)}
         </p>
       </header>
 

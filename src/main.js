@@ -31,7 +31,7 @@ import {
   setImageSizes,
 } from "./lib/renderers.js";
 
-const SITE_NAME = "出界百科";
+const SITE_NAME = siteConfig.siteName;
 
 setImageSizes(imageSizes);
 
@@ -347,7 +347,17 @@ function bindEvents() {
   });
 }
 
+// 記事の静的ページ (wiki/…/) の検索欄は ?q=語 を付けてここへ来る。来たら同じ語で検索結果を出す
+function applySearchQueryFromUrl() {
+  const query = new URLSearchParams(window.location.search).get("q");
+  if (query) {
+    elements.searchInput.value = query;
+    updateSearchResults(query);
+  }
+}
+
 renderStaticSections();
 clearSearchResults();
 bindEvents();
 renderRoute();
+applySearchQueryFromUrl();

@@ -3,8 +3,10 @@ import { existsSync, mkdirSync, watch } from "node:fs";
 import { createServer } from "node:http";
 import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
+import { siteConfig } from "../src/data/site-config.js";
+import { buildStaticSite } from "../src/lib/static-pages.js";
 import { resolveVaultPath, syncVault } from "./sync-vault.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -67,6 +69,41 @@ async function resolveFilePath(absolutePath) {
   } catch {
     return absolutePath;
   }
+}
+
+// 記事・カテゴリの静的ページ (本番は npm run build:site が dist/wiki/… に書き出す) を、開発中はその場で組み立てて返す。
+// 記事データ (content-data.js) が作り直されるたびに読み直す。描画関数 (renderers.js など) を書き換えたときは
+// SPA は再読み込みで反映されるが、静的ページはこのサーバーを起動し直すまで古いまま
+const generatedDataPath = path.join(projectRoot, "src", "data", "generated", "content-data.js");
+let devStaticSite = { version: null, site: null };
+
+async function loadDevStaticSite(origin) {
+  const { mtimeMs } = await stat(generatedDataPath);
+  const version = `${mtimeMs}:${origin}`;
+  if (devStaticSite.version !== version) {
+    const { generatedArticles, imageSizes } = await import(
+      `${pathToFileURL(generatedDataPath).href}?v=${mtimeMs}`
+    );
+    const site = buildStaticSite({
+      articles: generatedArticles,
+      indexHtml: await readFile(path.join(projectRoot, "index.html"), "utf8"),
+      siteUrl: `${origin}/`,
+      siteName: siteConfig.siteName,
+      imageSizes,
+    });
+    devStaticSite = { version, site };
+  }
+  return devStaticSite.site;
+}
+
+async function findDevStaticPage(requestUrl) {
+  const pathname = decodeURIComponent(requestUrl.pathname);
+  if (!/^\/(wiki|category)\//.test(pathname)) {
+    return null;
+  }
+  const filePath = `${pathname.replace(/^\/+/, "").replace(/\/?(index\.html)?$/, "")}/index.html`;
+  const site = await loadDevStaticSite(requestUrl.origin);
+  return site.pages.find((page) => page.filePath === filePath) ?? null;
 }
 
 const reloadClients = new Set();
@@ -162,6 +199,22 @@ const server = createServer(async (request, response) => {
       response.write(": connected\n\n");
       reloadClients.add(response);
       request.on("close", () => reloadClients.delete(response));
+      return;
+    }
+
+    const staticPage = await findDevStaticPage(requestUrl);
+    if (staticPage && !/(\/|\/index\.html)$/.test(requestUrl.pathname)) {
+      // GitHub Pages と同じく末尾に / を付けた URL へ送る (相対リンクがずれないように)
+      response.writeHead(301, { location: `${requestUrl.pathname}/${requestUrl.search}` });
+      response.end();
+      return;
+    }
+    if (staticPage) {
+      response.writeHead(200, {
+        "cache-control": "no-store",
+        "content-type": "text/html; charset=utf-8",
+      });
+      response.end(staticPage.html.replace("</body>", `${reloadClientScript}\n</body>`));
       return;
     }
 
