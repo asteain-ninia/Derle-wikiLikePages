@@ -296,7 +296,8 @@ export function extractLeadingTemplates(sourceText) {
     const range = templateRanges[i];
     body = body.slice(0, range.start) + body.slice(range.end);
   }
-  body = body.replace(/^\s+/, "").replace(/\n{3,}/g, "\n\n");
+  // 先頭の空行だけ落とす (行頭の空白まで落とすと、原稿の最初の行のリストの字下げが消える)
+  body = body.replace(/^(?:[ \t]*\n)+/, "").replace(/\n{3,}/g, "\n\n");
 
   return {
     templates,
@@ -756,10 +757,23 @@ function extractCategoryTags(text) {
   return { text: cleaned, categoryTags: tags };
 }
 
+// 行頭の字下げの幅。Markdown 式のリストの入れ子の深さに使う。
+// タブは CommonMark と同じく次のタブ位置 (4 文字ごと) まで進める (スペースとタブが混ざっても同じ幅になる)
+function measureIndent(rawLine) {
+  let width = 0;
+  for (const character of /^[ \t]*/.exec(rawLine)[0]) {
+    width = character === "\t" ? width + 4 - (width % 4) : width + 1;
+  }
+  return width;
+}
+
 function buildParagraphs(lines) {
   const paragraphs = [];
   let currentParagraph = "";
   let lineIndex = 0;
+  // Markdown 式のリストの入れ子 (Obsidian と同じく、タブか 2 文字以上のスペースで親より深く
+  // 字下げした項目は子)。開いている階層ごとの字下げ幅とマーカー列を積んでおく
+  let listIndentStack = [];
 
   function flushParagraph() {
     if (!currentParagraph) {
@@ -771,6 +785,32 @@ function buildParagraphs(lines) {
       paragraphs.push(normalized);
     }
     currentParagraph = "";
+  }
+
+  // 字下げの深さから MediaWiki 式のマーカー列 ("*", "**", "#*" …) を決める。
+  // 親より 2 文字以上深ければ子、それより浅ければ同じ深さの階層まで戻って兄弟にする
+  function buildIndentedListMarkers(marker, indent) {
+    // 直前がリスト項目でなければ (段落や見出しを挟んだら) 入れ子は仕切り直し
+    if (paragraphs[paragraphs.length - 1]?.type !== "list-item") {
+      listIndentStack = [];
+    }
+    while (listIndentStack.length > 0 && listIndentStack[listIndentStack.length - 1].indent > indent) {
+      listIndentStack.pop();
+    }
+
+    const parent = listIndentStack[listIndentStack.length - 1];
+    if (!parent) {
+      listIndentStack.push({ indent, markers: marker });
+    } else if (indent >= parent.indent + 2) {
+      listIndentStack.push({ indent, markers: parent.markers + marker });
+    } else {
+      // 同じ深さ (差が 2 文字未満も同じ扱い)。マーカーの種類はこの項目のものに替える
+      listIndentStack[listIndentStack.length - 1] = {
+        indent: parent.indent,
+        markers: parent.markers.slice(0, -1) + marker,
+      };
+    }
+    return listIndentStack[listIndentStack.length - 1].markers;
   }
 
   while (lineIndex < lines.length) {
@@ -994,7 +1034,7 @@ function buildParagraphs(lines) {
 
     // List items keep their MediaWiki-style marker string ("*", "#", "*#", ...):
     // its length is the nesting depth and each character is that level's list type.
-    // Nested/mixed lists: **, ##, *#, #* etc.
+    // Nested/mixed lists: **, ##, *#, #* etc. (書かれたマーカー列をそのまま使い、字下げは見ない)
     const nestedBulletMatch = /^([*#]{2,})\s+(.+)$/.exec(trimmed);
     if (nestedBulletMatch) {
       flushParagraph();
@@ -1006,6 +1046,7 @@ function buildParagraphs(lines) {
       continue;
     }
 
+    // マーカー 1 つの項目 (- / * / + / ・ / 1. / #) は、行頭の字下げで入れ子の深さを決める
     const bulletMatch =
       /^([*\-+])(?:\s+|(?=<))(.+)$/.exec(trimmed) ?? /^(・)\s*(.+)$/.exec(trimmed);
     const orderedMatch = /^(\d+)[.)]\s+(.+)$/.exec(trimmed)
@@ -1017,7 +1058,7 @@ function buildParagraphs(lines) {
       if (normalizedItem) {
         paragraphs.push({
           type: "list-item",
-          markers: bulletMatch ? "*" : "#",
+          markers: buildIndentedListMarkers(bulletMatch ? "*" : "#", measureIndent(rawLine)),
           body: normalizedItem,
         });
       }
@@ -1362,7 +1403,10 @@ export function buildArticleRecord({
     /\{\{main\|([^}]+)\}\}/gi,
     (_match, articleName) => `\x00MAIN:${articleName.trim()}\x00`
   );
-  const cleanedBody = stripInlineTemplates(bodyWithMainConverted).trim();
+  // 先頭の空行と末尾の空白だけ落とす (最初の行の字下げはリストの入れ子に使うので残す)
+  const cleanedBody = stripInlineTemplates(bodyWithMainConverted)
+    .replace(/^(?:[ \t]*\n)+/, "")
+    .trimEnd();
   const restoredBody = restoreNowiki(cleanedBody, nowikiPlaceholders);
   const sections = parseMarkdownSections(restoredBody);
   const leadParagraphs = buildSummaryParagraphs(sections);
