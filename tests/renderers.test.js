@@ -1105,6 +1105,60 @@ test("renderArticlePage は見出しの深さで目次を入れ子にし、### �
   assert.match(rendered, /<h5 class="article-section__heading">細部<\/h5>/);
 });
 
+test("renderArticlePage は見出しの中のリンクを本文と同じリンクにし、目次と移動先の id は平文のままにする", () => {
+  const rendered = renderArticlePage({
+    id: "world",
+    title: "出界",
+    category: "地域",
+    created: "2026-03-10",
+    updated: "2026-03-15",
+    summary: "",
+    aliases: [],
+    tags: [],
+    unresolvedLinkCount: 1,
+    backlinks: [],
+    sections: [
+      { heading: "概要", headingSegments: [{ type: "text", value: "概要" }], level: 2, anchorId: "section-概要", paragraphs: [] },
+      {
+        heading: "ラウム圏",
+        headingSegments: [
+          { type: "link", status: "resolved", href: "#!article/raum", label: "ラウム圏", title: "ラウム圏" },
+        ],
+        level: 3,
+        anchorId: "section-ラウム圏",
+        paragraphs: [],
+      },
+      {
+        heading: "コルニア圏（南極圏）",
+        headingSegments: [
+          { type: "link", status: "missing", href: "#!missing/コルニア圏", label: "コルニア圏", title: "コルニア圏" },
+          { type: "text", value: "（南極圏）" },
+        ],
+        level: 3,
+        anchorId: "section-コルニア圏（南極圏）",
+        paragraphs: [],
+      },
+    ],
+    templateModels: [],
+    footnotes: [],
+    history: [],
+  });
+
+  assert.match(
+    rendered,
+    /<section class="article-section article-section--sub" id="section-ラウム圏">\s*<h4 class="article-section__heading"><a class="wiki-link" href="#!article\/raum">ラウム圏<\/a><\/h4>/
+  );
+  assert.match(
+    rendered,
+    /<h4 class="article-section__heading"><a class="wiki-link wiki-link--missing" href="#!missing\/コルニア圏">コルニア圏<\/a>（南極圏）<\/h4>/
+  );
+  const toc = rendered.match(/<ol class="toc__list">(.*?)<\/ol>\s*<\/nav>/s)[1];
+  assert.equal(
+    toc,
+    '<li><a href="#section-ラウム圏">ラウム圏</a></li><li><a href="#section-コルニア圏（南極圏）">コルニア圏（南極圏）</a></li>'
+  );
+});
+
 test("renderMaintenanceReportPage は保守レポートを記事と同じ見た目のページにし、記事や未作成の名前へリンクする", () => {
   const rendered = renderMaintenanceReportPage({
     generatedAt: "2026-11-05T00:00:00.000Z",
