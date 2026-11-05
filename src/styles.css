@@ -475,18 +475,38 @@ html[data-file-protocol="true"] .protocol-warning {
   background: var(--color-surface-soft);
   border: 1px solid var(--color-border-soft);
   padding: 12px 20px;
-  margin: 0 20px 4px;
+  margin: 0 0 18px;
   width: fit-content;
   max-width: 100%;
 }
 
-.toc h3 {
+/* 「目次」を押すと畳める。三角は閉じていると右、開いていると下を向く */
+.toc__title {
+  cursor: pointer;
+  list-style: none;
   font-size: 0.95rem;
-  margin: 0 0 6px;
+  font-weight: 700;
+}
+
+.toc__title::-webkit-details-marker {
+  display: none;
+}
+
+.toc__title::before {
+  content: "▶";
+  display: inline-block;
+  margin-right: 6px;
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  transition: transform 0.15s ease;
+}
+
+.toc__details[open] > .toc__title::before {
+  transform: rotate(90deg);
 }
 
 .toc__list {
-  margin: 0;
+  margin: 6px 0 0;
   padding-left: 0;
   font-size: 0.9rem;
   line-height: 1.8;
@@ -773,10 +793,12 @@ html[data-file-protocol="true"] .protocol-warning {
   overflow-x: auto;
 }
 
+/* 表は中身の幅に合わせる (横いっぱいに広げない)。中身が画面より広ければ上の .wikitable-scroll が横スクロールにする */
 .wikitable {
   border-collapse: collapse;
   margin: 12px 0;
-  width: 100%;
+  width: auto;
+  max-width: 100%;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   font-size: 0.9rem;
@@ -850,6 +872,13 @@ html[data-file-protocol="true"] .protocol-warning {
 .footnote-ref a {
   text-decoration: none;
   white-space: nowrap;
+}
+
+/* 脚注の一覧から本文の番号へ戻る */
+.footnote__backref {
+  margin-left: 4px;
+  color: var(--color-link);
+  text-decoration: none;
 }
 
 .notice--main-article {

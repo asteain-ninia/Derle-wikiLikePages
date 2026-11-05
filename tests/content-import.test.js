@@ -979,3 +979,81 @@ test("buildArticleRecord は外部リンク ([URL ラベル] と [ラベル](URL
   // 要約の平文でもラベルだけが残り、番号は [N] になる
   assert.equal(article.summary, "ラベル[1]とラベル[2]と外部[3]。");
 });
+
+test("parseMarkdownSections は空白なしの *項目 / #項目 を項目にし、行頭の Markdown の斜体は本文のままにする", () => {
+  const [section] = parseMarkdownSections(
+    [
+      "*サナ州国立大学",
+      "*<small>詳しくはクラン市を参照</small>",
+      "#一つ目",
+      "*項目の中の *強調* は項目のまま",
+      "",
+      "*os* と *lis* の使い分け。",
+      "",
+      "*.bale ceaks xila-or.*",
+      "",
+      "*<small>詳しくは[[デーレ文字]]を参照</small>*",
+      "",
+      "**太字**で始まる段落。",
+    ].join("\n")
+  );
+  assert.deepEqual(section.paragraphs.slice(0, 4), [
+    { type: "list-item", markers: "*", body: "サナ州国立大学" },
+    { type: "list-item", markers: "*", body: "<small>詳しくはクラン市を参照</small>" },
+    { type: "list-item", markers: "#", body: "一つ目" },
+    { type: "list-item", markers: "*", body: "項目の中の *強調* は項目のまま" },
+  ]);
+  assert.deepEqual(section.paragraphs.slice(4), [
+    "*os* と *lis* の使い分け。",
+    "*.bale ceaks xila-or.*",
+    "*<small>詳しくは[[デーレ文字]]を参照</small>*",
+    "**太字**で始まる段落。",
+  ]);
+});
+
+test("parseMarkdownSections は = の間に空白を挟んだ見出しを読み、深さを前後の = の少ない方にする", () => {
+  const sections = parseMarkdownSections(
+    ["冒頭。", "", "= = 見出しA = =", "本文。", "", "= = = 見出しB = = =", "本文。", "", "=== 見出しC ==", "本文。"].join("\n")
+  );
+  assert.deepEqual(
+    sections.slice(1).map((section) => [section.heading, section.level]),
+    [
+      ["見出しA", 2],
+      ["見出しB", 3],
+      ["見出しC", 2],
+    ]
+  );
+});
+
+test("parseMarkdownSections は <syntaxhighlight> のタグの直後と直前の改行を本文に含めない", () => {
+  const [section] = parseMarkdownSections(
+    ['<syntaxhighlight lang="js">', "const a = 1;", "", "const b = 2;", "</syntaxhighlight>"].join("\n")
+  );
+  assert.deepEqual(section.paragraphs[0], { type: "code-block", language: "js", body: "const a = 1;\n\nconst b = 2;" });
+});
+
+test("buildArticleRecord は自己終了の <ref name=... /> を同じ脚注の再利用として扱い、前後の本文を飲み込まない", () => {
+  const article = buildArticleRecord({
+    relativePath: "test.md",
+    fileBasename: "テスト",
+    created: "2026-03-20",
+    updated: "2026-03-23",
+    sourceText:
+      '本文A<ref name=":0">名前付きの脚注</ref>と本文B<ref name=":0" />。本文C<ref>無名の脚注</ref>と本文D<ref name=":0"/>。' +
+      '先に参照<ref name="後">後ろに本文がある脚注</ref>…ではなく<ref name="前" />本文E<ref name="前">前で参照した脚注</ref>。' +
+      '本文の無い名前<ref name="無し" />と空の<ref></ref>で終わる。\n\n<references />',
+  });
+
+  assert.deepEqual(article.footnotes, [
+    "名前付きの脚注",
+    "無名の脚注",
+    "後ろに本文がある脚注",
+    "前で参照した脚注",
+  ]);
+  const mark = (number) => `${number}`;
+  assert.equal(
+    article.sections[0].paragraphs[0],
+    `本文A${mark(1)}と本文B${mark(1)}。本文C${mark(2)}と本文D${mark(1)}。` +
+      `先に参照${mark(3)}…ではなく${mark(4)}本文E${mark(4)}。本文の無い名前と空ので終わる。`
+  );
+});

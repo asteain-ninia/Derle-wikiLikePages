@@ -1138,7 +1138,40 @@ test("renderArticlePage は本文の脚注番号から脚注の一覧 (id が fn
   });
 
   assert.match(rendered, /<p>2015年<sup class="footnote-ref" id="fnref-1"><a href="#fn-1">\[1\]<\/a><\/sup>に始まった。<\/p>/);
-  assert.match(rendered, /<li id="fn-1"><span class="footnote__number">\[1\]<\/span> 出典A<\/li>/);
+  assert.match(
+    rendered,
+    /<li id="fn-1"><span class="footnote__number">\[1\]<\/span> 出典A <a class="footnote__backref" href="#fnref-1" aria-label="本文へ戻る">↩<\/a><\/li>/
+  );
+});
+
+test("renderArticlePage は同じ番号の 2 回目以降の id を外し、本文に番号の無い脚注の ↩ を外す", () => {
+  const rendered = renderArticlePage({
+    title: "テスト",
+    category: "記事",
+    created: "2026-03-10",
+    updated: "2026-03-15",
+    summary: "",
+    aliases: [],
+    tags: [],
+    unresolvedLinkCount: 0,
+    backlinks: [],
+    footnotes: ["出典A", "題の中だけの脚注"],
+    sections: [
+      {
+        heading: "概要",
+        anchorId: "section-概要",
+        // 名前付きの脚注を 2 回参照した本文 (印は U+E018 番号 U+E019)
+        paragraphs: [[{ type: "text", value: "前1と後1。" }]],
+      },
+    ],
+    templateModels: [],
+    history: [],
+  });
+
+  assert.equal(rendered.match(/id="fnref-1"/g).length, 1);
+  assert.equal(rendered.match(/href="#fn-1"/g).length, 2);
+  assert.match(rendered, /href="#fnref-1"/);
+  assert.doesNotMatch(rendered, /href="#fnref-2"/);
 });
 
 test("renderArticlePage renders ordered and nested mixed lists", () => {
@@ -1242,7 +1275,7 @@ test("renderArticlePage は見出しの深さで目次を入れ子にし、### �
     history: [],
   });
 
-  const toc = rendered.match(/<ol class="toc__list">(.*?)<\/ol>\s*<\/nav>/s)[1];
+  const toc = rendered.match(/<ol class="toc__list">(.*?)<\/ol>\s*<\/details>\s*<\/nav>/s)[1];
   assert.equal(
     toc,
     '<li><a href="#section-歴史">歴史</a><ol><li><a href="#section-起源">起源</a><ol><li><a href="#section-細部">細部</a></li></ol></li></ol></li><li><a href="#section-教義">教義</a></li>'
@@ -1299,7 +1332,7 @@ test("renderArticlePage は見出しの中のリンクを本文と同じリン�
     rendered,
     /<h4 class="article-section__heading"><a class="wiki-link wiki-link--missing" href="#!missing\/コルニア圏">コルニア圏<\/a>（南極圏）<\/h4>/
   );
-  const toc = rendered.match(/<ol class="toc__list">(.*?)<\/ol>\s*<\/nav>/s)[1];
+  const toc = rendered.match(/<ol class="toc__list">(.*?)<\/ol>\s*<\/details>\s*<\/nav>/s)[1];
   assert.equal(
     toc,
     '<li><a href="#section-ラウム圏">ラウム圏</a></li><li><a href="#section-コルニア圏（南極圏）">コルニア圏（南極圏）</a></li>'

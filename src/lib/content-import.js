@@ -655,6 +655,10 @@ const FOOTNOTE_REF_OPEN = "";
 const FOOTNOTE_REF_CLOSE = "";
 const FOOTNOTE_MARK = /(\d+)/g;
 
+// 行頭の Markdown の斜体 (`*os* と…`)。閉じる * の直前が空白でなく、** の一部でもない。
+// これに当たる行は空白なしの箇条書き `*項目` とみなさない
+const MARKDOWN_LEADING_EMPHASIS = /^\*[^*\s](?:[^*]*?[^*\s])?\*(?!\*)/;
+
 // 脚注番号の印を平文の [N] にする (要約・検索・callout の題など、描画で解釈しない場所用)
 function plainFootnoteMarks(text) {
   return text.replace(FOOTNOTE_MARK, "[$1]");
@@ -681,15 +685,52 @@ function moveFootnoteMarksOutOfLinks(text) {
   );
 }
 
+// 自己終了の <ref name="a" /> を先に試す。開始タグと取り違えると次の </ref> までの本文を脚注に飲み込む
+const REF_PATTERN = /<ref(\s[^>]*?)?\s*\/>|<ref(\s[^>]*?)?>([\s\S]*?)<\/ref>/gi;
+const REF_NAME_PATTERN = /\bname\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'/>]+))/i;
+
+function readRefName(attributes) {
+  const match = REF_NAME_PATTERN.exec(attributes ?? "");
+  const name = match ? (match[1] ?? match[2] ?? match[3]).trim() : "";
+  return name || null;
+}
+
+// MediaWiki と同じく、名前付きの脚注 (<ref name="a">…</ref>) は同じ名前で何度でも参照でき、番号は
+// その名前が最初に出た所で決まる。本文は名前のどこか 1 か所に書けばよい (後ろに書いてもよい)。
+// 本文がどこにも無い名前の参照と、本文が空の無名の <ref></ref> は番号を出さない
 function processFootnotes(text) {
+  const bodiesByName = new Map();
+  for (const match of text.matchAll(REF_PATTERN)) {
+    const name = match[3] !== undefined ? readRefName(match[2]) : null;
+    const body = match[3]?.trim();
+    if (name && body && !bodiesByName.has(name)) {
+      bodiesByName.set(name, body);
+    }
+  }
+
   const footnotes = [];
-  const processed = text.replace(/<ref(?:\s[^>]*)?>[\s\S]*?<\/ref>/gi, (match) => {
-    const bodyMatch = /<ref(?:\s[^>]*)?>(.+?)<\/ref>/is.exec(match);
-    if (!bodyMatch) {
+  const numbersByName = new Map();
+  const mark = (number) => `${FOOTNOTE_REF_OPEN}${number}${FOOTNOTE_REF_CLOSE}`;
+  const processed = text.replace(REF_PATTERN, (_match, selfClosingAttributes, attributes, rawBody) => {
+    const isSelfClosing = rawBody === undefined;
+    const name = readRefName(isSelfClosing ? selfClosingAttributes : attributes);
+    if (!name) {
+      const body = rawBody?.trim();
+      if (!body) {
+        return "";
+      }
+      footnotes.push(body);
+      return mark(footnotes.length);
+    }
+    if (numbersByName.has(name)) {
+      return mark(numbersByName.get(name));
+    }
+    if (!bodiesByName.has(name)) {
       return "";
     }
-    footnotes.push(bodyMatch[1].trim());
-    return `${FOOTNOTE_REF_OPEN}${footnotes.length}${FOOTNOTE_REF_CLOSE}`;
+    footnotes.push(bodiesByName.get(name));
+    numbersByName.set(name, footnotes.length);
+    return mark(footnotes.length);
   });
   const cleaned = moveFootnoteMarksOutOfLinks(processed.replace(/<references\s*\/>/gi, ""));
   return { text: cleaned, footnotes };
@@ -970,7 +1011,8 @@ function buildParagraphs(lines) {
         paragraphs.push({
           type: "code-block",
           language: langMatch ? langMatch[1] : "",
-          body: codeMatch[1],
+          // タグの直後と直前の改行は本文ではない (残すと <pre> の上下に空行が出る)
+          body: codeMatch[1].replace(/^(?:\r?\n)+|(?:\r?\n)+$/g, ""),
         });
       }
       lineIndex = codeEndIndex;
@@ -1001,16 +1043,22 @@ function buildParagraphs(lines) {
     }
 
     const headingMatch = /^(#{2,6})\s+(.+)$/.exec(trimmed);
+    // MediaWiki の見出しは = の間に空白を挟んでもよい (= = = 見出し = = =)。深さは前後の = の少ない方
     const mwHeadingMatch = !headingMatch
-      ? /^(={2,6})\s*(.+?)\s*=+\s*$/.exec(trimmed)
+      ? /^(=(?:\s*=){1,5})\s*(.+?)\s*(=(?:\s*=){1,5})\s*$/.exec(trimmed)
       : null;
     if (headingMatch || mwHeadingMatch) {
       flushParagraph();
-      const match = headingMatch ?? mwHeadingMatch;
+      const level = headingMatch
+        ? headingMatch[1].length
+        : Math.min(
+            mwHeadingMatch[1].replace(/\s/g, "").length,
+            mwHeadingMatch[3].replace(/\s/g, "").length
+          );
       paragraphs.push({
         type: "heading",
-        level: match[1].length,
-        text: match[2].trim(),
+        level,
+        text: (headingMatch ?? mwHeadingMatch)[2].trim(),
       });
       lineIndex += 1;
       continue;
@@ -1081,10 +1129,14 @@ function buildParagraphs(lines) {
     }
 
     // マーカー 1 つの項目 (- / * / + / ・ / 1. / #) は、行頭の字下げで入れ子の深さを決める
+    // MediaWiki と同じく `*項目` / `#項目` は空白が無くても項目にする。ただし `*os* と…` のように
+    // 行頭が Markdown の斜体 (閉じる * の直前が空白でない) なら項目ではなく本文
     const bulletMatch =
-      /^([*\-+])(?:\s+|(?=<))(.+)$/.exec(trimmed) ?? /^(・)\s*(.+)$/.exec(trimmed);
+      (MARKDOWN_LEADING_EMPHASIS.test(trimmed) ? null : /^(\*)(?!\*)\s*(.+)$/.exec(trimmed))
+      ?? /^([-+])(?:\s+|(?=<))(.+)$/.exec(trimmed)
+      ?? /^(・)\s*(.+)$/.exec(trimmed);
     const orderedMatch = /^(\d+)[.)]\s+(.+)$/.exec(trimmed)
-      ?? /^(#)\s+(.+)$/.exec(trimmed);
+      ?? /^(#)(?!#)\s*(.+)$/.exec(trimmed);
     if (bulletMatch || orderedMatch) {
       flushParagraph();
       const itemText = bulletMatch ? bulletMatch[2] : orderedMatch?.[2] ?? "";

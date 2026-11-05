@@ -11,7 +11,7 @@ import {
 import { loadTemplateHandlers } from "../src/lib/template-registry.js";
 import { buildBuildArtifacts } from "../src/lib/build-artifacts.js";
 import { readImageSize } from "../src/lib/image-size.js";
-import { summarizeArticleHistory } from "../src/lib/article-history.js";
+import { buildCommitBaseUrl, summarizeArticleHistory } from "../src/lib/article-history.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -65,7 +65,7 @@ function getGitCommits(repoRelativePath) {
   try {
     const output = execFileSync(
       "git",
-      ["log", "--follow", "--format=%cs\t%s", "--", repoRelativePath],
+      ["log", "--follow", "--format=%H\t%cs\t%s", "--", repoRelativePath],
       {
         cwd: projectRoot,
         encoding: "utf8",
@@ -77,18 +77,34 @@ function getGitCommits(repoRelativePath) {
       .map((line) => line.trim())
       .filter(Boolean)
       .map((line) => {
-        const [date, ...messageParts] = line.split("\t");
-        return { date, message: messageParts.join("\t") };
+        const [hash, date, ...messageParts] = line.split("\t");
+        return { hash, date, message: messageParts.join("\t") };
       });
   } catch {
     return [];
   }
 }
 
+// 更新履歴の文言からそのコミットのページへリンクする (Actions の checkout でも origin は GitHub の URL)
+function getCommitBaseUrl() {
+  try {
+    const remoteUrl = execFileSync("git", ["config", "--get", "remote.origin.url"], {
+      cwd: projectRoot,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    return buildCommitBaseUrl(remoteUrl);
+  } catch {
+    return null;
+  }
+}
+
+const commitBaseUrl = getCommitBaseUrl();
+
 // 作成日・更新日・更新履歴。履歴に載るのは wiki: のコミットと保管庫時代のコミットだけ (src/lib/article-history.js)。
 // まだコミットされていない原稿はファイルの日付を使う
 async function getFileHistory(absolutePath, repoRelativePath) {
-  const summary = summarizeArticleHistory(getGitCommits(repoRelativePath));
+  const summary = summarizeArticleHistory(getGitCommits(repoRelativePath), { commitBaseUrl });
   if (summary) {
     return summary;
   }
