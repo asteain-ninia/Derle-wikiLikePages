@@ -415,8 +415,9 @@ test("buildArticleRecord extracts footnotes from <ref> tags", () => {
   assert.equal(article.footnotes.length, 2);
   assert.equal(article.footnotes[0], "注釈1");
   assert.equal(article.footnotes[1], "注釈2");
-  assert.match(article.sections[0].paragraphs[0], /\[1\]/);
-  assert.match(article.sections[0].paragraphs[0], /\[2\]/);
+  // 本文には脚注番号の印 (U+E018 番号 U+E019) が残る。描画で [N] の上付きリンクになる
+  assert.match(article.sections[0].paragraphs[0], /1/);
+  assert.match(article.sections[0].paragraphs[0], /2/);
 });
 
 test("buildArticleRecord extracts [[Category:...]] as tags", () => {
@@ -911,4 +912,70 @@ test("parseMarkdownSections は見出しの原文 (sourceHeading) から HTML �
       ["", "節"],
     ]
   );
+});
+
+test("buildArticleRecord は脚注番号を印 (U+E018 番号 U+E019) で本文に残し、要約では [N] の文字にする", () => {
+  const article = buildArticleRecord({
+    relativePath: "test.md",
+    fileBasename: "テスト",
+    created: "2026-03-20",
+    updated: "2026-03-23",
+    sourceText: "2015年<ref>出典A</ref>に始まり、翌年<ref>出典B</ref>に終わった。原稿の [1] は残す。",
+  });
+
+  assert.deepEqual(article.footnotes, ["出典A", "出典B"]);
+  assert.equal(
+    article.sections[0].paragraphs[0],
+    "2015年1に始まり、翌年2に終わった。原稿の [1] は残す。"
+  );
+  assert.equal(article.summary, "2015年[1]に始まり、翌年[2]に終わった。原稿の [1] は残す。");
+});
+
+test("buildArticleRecord は [[リンク]] や ![[画像]] の中の <ref> をリンクの直後の脚注番号にし、callout の題では [N] にする", () => {
+  const article = buildArticleRecord({
+    relativePath: "test.md",
+    fileBasename: "テスト",
+    created: "2026-03-20",
+    updated: "2026-03-23",
+    sourceText: [
+      "[[B<ref>x</ref>]]と[[A|ラベル<ref>y</ref>]]と![[x.png|説明<ref>z</ref>]]。",
+      "",
+      "> [!note] 題<ref>w</ref>",
+      "> 本文",
+    ].join("\n"),
+  });
+
+  assert.deepEqual(article.footnotes, ["x", "y", "z", "w"]);
+  // 印はリンクの外に出るので、リンク先の名前・表示文字・画像の説明には混ざらない
+  assert.equal(
+    article.sections[0].paragraphs[0],
+    "[[B]]1と[[A|ラベル]]2と![[x.png|説明]]3。"
+  );
+  // 関連記事名・キーワードに印が漏れない (B や A が「B印」にならない)
+  assert.deepEqual(article.relatedTitles.slice(0, 2), ["B", "A"]);
+  for (const value of [...article.relatedTitles, ...article.keywords]) {
+    assert.ok(!value.includes("") && !value.includes("["), value);
+  }
+  // callout の題は描画で解釈しないので平文の [N]
+  const callout = article.sections[0].paragraphs.find((paragraph) => paragraph.type === "callout");
+  assert.equal(callout.title, "題[4]");
+});
+
+test("buildArticleRecord は外部リンク ([URL ラベル] と [ラベル](URL)) の中の <ref> もリンクの直後の脚注番号にする", () => {
+  const article = buildArticleRecord({
+    relativePath: "test.md",
+    fileBasename: "テスト",
+    created: "2026-03-20",
+    updated: "2026-03-23",
+    sourceText:
+      "[https://example.com/ ラベル<ref>x</ref>]と[ラベル<ref>y</ref>](https://example.com/)と[https://example.com/<ref>z</ref> 外部]。",
+  });
+
+  assert.deepEqual(article.footnotes, ["x", "y", "z"]);
+  assert.equal(
+    article.sections[0].paragraphs[0],
+    "[https://example.com/ ラベル]1と[ラベル](https://example.com/)2と[https://example.com/ 外部]3。"
+  );
+  // 要約の平文でもラベルだけが残り、番号は [N] になる
+  assert.equal(article.summary, "ラベル[1]とラベル[2]と外部[3]。");
 });

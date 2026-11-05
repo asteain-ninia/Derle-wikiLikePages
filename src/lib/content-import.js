@@ -48,7 +48,8 @@ function sanitizeInlineHtml(text) {
 
 function stripInlineFormatting(text) {
   // 描画側 (renderInlineMarkdown) と同じく、単語内の _ は強調として扱わない
-  return text
+  // 脚注番号の印 (processFootnotes) は要約・検索用の平文では [N] の文字にする
+  return plainFootnoteMarks(text)
     .replace(/\[([^\]]+?)\]\(https?:\/\/[^)\s]+\)/g, "$1")
     // MediaWiki の外部リンク [URL ラベル] はラベル、[URL] は URL だけを残す
     .replace(/\[(https?:\/\/[^\s[\]<>"]+)(?:[ \t]+([^\]\n]+?))?[ \t]*\]/g, (_match, url, label) => label ?? url)
@@ -366,7 +367,8 @@ function parseCalloutLines(lines, startIndex) {
   }
 
   const calloutType = calloutMatch[1].toLowerCase();
-  const title = calloutMatch[2].trim();
+  // 題は描画で escapeHtml するだけなので、脚注番号の印は平文の [N] にしておく
+  const title = plainFootnoteMarks(calloutMatch[2].trim());
   const bodyLines = [];
   let endIndex = startIndex + 1;
 
@@ -647,6 +649,38 @@ function extractBlockquotes(text) {
   return parts;
 }
 
+// 本文に残す脚注番号の印。描画 (renderers.js の renderInlineMarkdown) が脚注へ飛ぶ上付きのリンク [N] にし、
+// 平文化 (stripInlineFormatting) では [N] の文字にする。原稿の [1] と区別するため私用領域の文字で挟む
+const FOOTNOTE_REF_OPEN = "";
+const FOOTNOTE_REF_CLOSE = "";
+const FOOTNOTE_MARK = /(\d+)/g;
+
+// 脚注番号の印を平文の [N] にする (要約・検索・callout の題など、描画で解釈しない場所用)
+function plainFootnoteMarks(text) {
+  return text.replace(FOOTNOTE_MARK, "[$1]");
+}
+
+// リンクの中に入った印は、リンク先の名前・表示文字・画像の説明・URL に混ざらないようリンクの
+// 直後へ出す ([[B<ref>x</ref>]] → [[B]] + 印)。名前に印が残ると未解決リンクの一覧やキーワードに
+// 漏れ、表示文字に残るとリンクの中にリンクができ、URL に残ると属性が壊れる。
+// 対象: [[リンク]] / ![[画像]]、MediaWiki の [URL ラベル]、Markdown の [ラベル](URL)
+const LINK_PATTERNS = [
+  /!?\[\[[^[\]]*?\]\]/g,
+  /\[https?:\/\/[^\s[\]<>"]+(?:[ \t]+[^\]\n]+?)?[ \t]*\]/g,
+  /\[[^\]]+?\]\(https?:\/\/[^)\s]+\)/g,
+];
+
+function moveFootnoteMarksOutOfLinks(text) {
+  return LINK_PATTERNS.reduce(
+    (result, pattern) =>
+      result.replace(pattern, (link) => {
+        const marks = link.match(FOOTNOTE_MARK) ?? [];
+        return marks.length === 0 ? link : `${link.replace(FOOTNOTE_MARK, "")}${marks.join("")}`;
+      }),
+    text
+  );
+}
+
 function processFootnotes(text) {
   const footnotes = [];
   const processed = text.replace(/<ref(?:\s[^>]*)?>[\s\S]*?<\/ref>/gi, (match) => {
@@ -655,9 +689,9 @@ function processFootnotes(text) {
       return "";
     }
     footnotes.push(bodyMatch[1].trim());
-    return `[${footnotes.length}]`;
+    return `${FOOTNOTE_REF_OPEN}${footnotes.length}${FOOTNOTE_REF_CLOSE}`;
   });
-  const cleaned = processed.replace(/<references\s*\/>/gi, "");
+  const cleaned = moveFootnoteMarksOutOfLinks(processed.replace(/<references\s*\/>/gi, ""));
   return { text: cleaned, footnotes };
 }
 
