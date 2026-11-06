@@ -37,6 +37,6 @@
 - `renderInlineMarkdown` は生成済みタグ・コード・URL をプレースホルダ (U+E020/U+E021) に退避してから強調記法を処理する。nowiki のセンチネルは U+E010〜U+E017。`<ref>` の脚注番号は `content-import.js` が U+E018〜U+E019 で挟んで本文に残し、描画で脚注の一覧 (`id="fn-N"`) へ飛ぶ上付きのリンク `[N]` にする (ページ内の id へのリンクは `main.js` が自分で移動する。ハッシュを変えるとメインページへ戻るため)
 - `build:content` は記事データと一緒にリンクの解決結果 (`backlinks.json` など) と保守レポート (`src/data/generated/maintenance-report.md`: 孤立・行き止まり・未解決リンク・リンク密度) を書き出す。組み立ては `src/lib/build-artifacts.js` で、リンク解決は `buildWikiGraph` を使う。サイト内では `#!maintenance` (メインページ下の小さなリンク) が `maintenance-report.json` を読んで記事と同じ見た目で表示する
 - サイト名は「出界百科」(`index.html` と `src/data/site-config.js` の `siteName`)
-- `npm run build:site` は SPA のコピーに加えて、記事ごとの静的ページ `dist/wiki/<記事 ID>/index.html` (カテゴリは `dist/category/<名前>/`)・`sitemap.xml`・`robots.txt` を書き出す (`src/lib/static-pages.js`)。本文は SPA と同じ描画関数で描き、JavaScript は読み込まない。canonical・OGP の絶対 URL は `site-config.js` の `siteUrl` (Actions では Pages の URL を `SITE_URL` で渡す)。`npm run dev` でも `/wiki/…/` を開ける。記事画面の「固定リンク」がこの URL
+- `npm run build:site` は SPA のコピーに加えて、記事ごとの静的ページ `dist/article/<記事 ID>/index.html` (カテゴリは `dist/category/<名前>/`)・`sitemap.xml`・`robots.txt` を書き出す (`src/lib/static-pages.js`)。本文は SPA と同じ描画関数で描き、JavaScript は読み込まない。canonical・OGP の絶対 URL は `site-config.js` の `siteUrl` (Actions では Pages の URL を `SITE_URL` で渡す)。`npm run dev` でも `/article/…/` を開ける。記事画面の「固定リンク」がこの URL
 - 節は見出しの深さ `level` を持つ (## = 2)。目次は深さで入れ子にし、本文の見出しは ## を h3、### 以下を h4〜h6 にする
 - 画像は `build:content` が縦横を調べて `imageSizes` (content-data.js) に入れ、img に width / height を付ける。遅延読み込みの画像が後から伸びて見出しへの移動位置がずれるのを防ぐため

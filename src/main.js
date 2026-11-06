@@ -347,7 +347,7 @@ function bindEvents() {
   });
 }
 
-// 記事の静的ページ (wiki/…/) の検索欄は ?q=語 を付けてここへ来る。来たら同じ語で検索結果を出す
+// 記事の静的ページ (article/…/) の検索欄は ?q=語 を付けてここへ来る。来たら同じ語で検索結果を出す
 function applySearchQueryFromUrl() {
   const query = new URLSearchParams(window.location.search).get("q");
   if (query) {

@@ -1,4 +1,4 @@
-// 記事・カテゴリごとの静的 HTML (dist/wiki/…/index.html, dist/category/…/index.html) と
+// 記事・カテゴリごとの静的 HTML (dist/article/…/index.html, dist/category/…/index.html) と
 // sitemap.xml / robots.txt を組み立てる。ファイルには触れず、文字列だけを返す
 // (書き出しは scripts/build-site.mjs、開発サーバーは scripts/dev-server.mjs がその場で返す)。
 //
@@ -53,7 +53,7 @@ export function isStaticPathSafeName(name) {
   );
 }
 
-// "wiki/%E5%9B%BD/…/" → "wiki/国/…/index.html" (dist/ からのファイルの場所)
+// "article/%E5%9B%BD/…/" → "article/国/…/index.html" (dist/ からのファイルの場所)
 export function staticHrefToFilePath(href) {
   return `${href
     .split("/")
@@ -62,7 +62,7 @@ export function staticHrefToFilePath(href) {
     .join("/")}/index.html`;
 }
 
-// 静的ページからサイト直下へ戻る相対パス ("wiki/国/アクセル/" → "../../../")
+// 静的ページからサイト直下へ戻る相対パス ("article/国/アクセル/" → "../../../")
 export function rootPrefixFor(href) {
   return "../".repeat(href.split("/").filter(Boolean).length);
 }
@@ -88,14 +88,14 @@ function decodeHtmlAttribute(value) {
 
 const URL_ATTRIBUTE_PATTERN = /(\s(?:href|src))="([^"]*)"/g;
 // サイト直下からの相対パスで書かれた (SPA の index.html から見た) 中身の場所
-const SITE_RELATIVE_PREFIXES = ["content/", "src/", "wiki/", "category/"];
+const SITE_RELATIVE_PREFIXES = ["content/", "src/", "article/", "category/"];
 
 // SPA 向けに描画した HTML の href / src を、静的ページの場所から正しく辿れるように書き換える。
-// - #!article/ID[/見出し]: 静的ページ (wiki/ID/#section-…) へ
+// - #!article/ID[/見出し]: 静的ページ (article/ID/#section-…) へ
 // - #!category/名前: 静的ページがあればそこへ、無ければ SPA へ
 // - そのほかの #!…、ページ内に無い #id (パンくずの #overview など): SPA (サイト直下) へ
 // - ページ内の #id (目次・脚注)、外部リンク: そのまま
-// - content/ や wiki/ などサイト直下からの相対パス: サイト直下からに付け直す
+// - content/ や article/ などサイト直下からの相対パス: サイト直下からに付け直す
 export function rewriteInternalUrls(html, { rootPrefix, entryById, staticCategoryNames = new Set() }) {
   const idsInPage = new Set([...html.matchAll(/\sid="([^"]*)"/g)].map((match) => decodeHtmlAttribute(match[1])));
 

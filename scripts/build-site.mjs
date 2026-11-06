@@ -60,7 +60,7 @@ await cp(contentRoot, path.join(distRoot, "content"), {
   },
 });
 
-// 記事・カテゴリごとの静的ページ (wiki/…/index.html, category/…/index.html) と sitemap.xml / robots.txt。
+// 記事・カテゴリごとの静的ページ (article/…/index.html, category/…/index.html) と sitemap.xml / robots.txt。
 // SPA (index.html + src/) はそのまま配信し、静的ページは同じ描画関数で本文を書いた別の入口 (src/lib/static-pages.js)
 const { generatedArticles, imageSizes } = await import(
   pathToFileURL(path.join(projectRoot, "src", "data", "generated", "content-data.js")).href

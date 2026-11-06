@@ -775,7 +775,7 @@ function renderHistory(history) {
   `;
 }
 
-// 記事の静的ページ (wiki/…/) へのリンク。共有するとき (SNS のカードや検索エンジン) はこちらの URL を使う
+// 記事の静的ページ (article/…/) へのリンク。共有するとき (SNS のカードや検索エンジン) はこちらの URL を使う
 function renderPermalink(entryId) {
   if (!entryId) {
     return "";

@@ -220,7 +220,7 @@ export function buildDisambiguationHref(title) {
 // 記事・カテゴリごとの静的ページ (npm run build:site が dist/ に書き出す) の、サイト直下からの URL。
 // 名前の / はそのままフォルダの区切りにし、区切りごとに encodeURIComponent する。末尾は / (中身は index.html)
 export function buildStaticArticleHref(entryId) {
-  return buildStaticHref("wiki", entryId);
+  return buildStaticHref("article", entryId);
 }
 
 export function buildStaticCategoryHref(categoryName) {

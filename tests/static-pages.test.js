@@ -105,16 +105,16 @@ function detailViewHtml(html) {
 }
 
 test("静的ページの URL は記事 ID の / をフォルダにし、日本語を区切りごとにエンコードする", () => {
-  assert.equal(buildStaticArticleHref("出界"), "wiki/%E5%87%BA%E7%95%8C/");
+  assert.equal(buildStaticArticleHref("出界"), "article/%E5%87%BA%E7%95%8C/");
   assert.equal(
     buildStaticArticleHref("国/過去の国/エナ国"),
-    `wiki/${encodeURIComponent("国")}/${encodeURIComponent("過去の国")}/${encodeURIComponent("エナ国")}/`
+    `article/${encodeURIComponent("国")}/${encodeURIComponent("過去の国")}/${encodeURIComponent("エナ国")}/`
   );
-  assert.equal(buildStaticArticleHref("A&B #1?"), "wiki/A%26B%20%231%3F/");
+  assert.equal(buildStaticArticleHref("A&B #1?"), "article/A%26B%20%231%3F/");
   assert.equal(buildStaticCategoryHref("過去の国"), `category/${encodeURIComponent("過去の国")}/`);
 
-  assert.equal(staticHrefToFilePath(buildStaticArticleHref("国/過去の国/エナ国")), "wiki/国/過去の国/エナ国/index.html");
-  assert.equal(staticHrefToFilePath(buildStaticArticleHref("A&B #1?")), "wiki/A&B #1?/index.html");
+  assert.equal(staticHrefToFilePath(buildStaticArticleHref("国/過去の国/エナ国")), "article/国/過去の国/エナ国/index.html");
+  assert.equal(staticHrefToFilePath(buildStaticArticleHref("A&B #1?")), "article/A&B #1?/index.html");
   assert.equal(rootPrefixFor(buildStaticArticleHref("出界")), "../../");
   assert.equal(rootPrefixFor(buildStaticArticleHref("国/過去の国/エナ国")), "../../../../");
 });
@@ -126,8 +126,8 @@ test("静的ページにできない名前と、大文字小文字だけが違�
   assert.equal(isStaticPathSafeName("カテゴリ:何か"), false);
   assert.equal(isStaticPathSafeName("末尾."), false);
 
-  assert.deepEqual(findStaticPathCollisions(["wiki/Abc/index.html", "wiki/abc/index.html", "wiki/x/index.html"]), [
-    ["wiki/Abc/index.html", "wiki/abc/index.html"],
+  assert.deepEqual(findStaticPathCollisions(["article/Abc/index.html", "article/abc/index.html", "article/x/index.html"]), [
+    ["article/Abc/index.html", "article/abc/index.html"],
   ]);
   assert.throws(
     () =>
@@ -153,16 +153,16 @@ test("記事・カテゴリごとに静的ページを作り、title・descripti
   assert.deepEqual(
     site.pages.map((page) => page.filePath).sort(),
     [
+      "article/出界/index.html",
+      "article/国/アクセル/index.html",
       "category/世界/index.html",
       "category/国/index.html",
       "category/大圏/index.html",
-      "wiki/出界/index.html",
-      "wiki/国/アクセル/index.html",
     ]
   );
 
-  const { html, url } = pageFor(site, "wiki/国/アクセル/index.html");
-  const canonical = `${SITE_URL}wiki/${encodeURIComponent("国")}/${encodeURIComponent("アクセル")}/`;
+  const { html, url } = pageFor(site, "article/国/アクセル/index.html");
+  const canonical = `${SITE_URL}article/${encodeURIComponent("国")}/${encodeURIComponent("アクセル")}/`;
   assert.equal(url, canonical);
   assert.match(html, /<title>アクセル - 出界百科<\/title>/);
   assert.match(html, /<html lang="ja">/);
@@ -182,14 +182,14 @@ test("記事・カテゴリごとに静的ページを作り、title・descripti
   const category = pageFor(site, "category/国/index.html");
   assert.equal(metaContent(category.html, "property", "og:type"), "website");
   assert.match(category.html, /<title>国 - カテゴリ - 出界百科<\/title>/);
-  assert.ok(category.html.includes('href="../../wiki/%E5%9B%BD/%E3%82%A2%E3%82%AF%E3%82%BB%E3%83%AB/"'));
+  assert.ok(category.html.includes('href="../../article/%E5%9B%BD/%E3%82%A2%E3%82%AF%E3%82%BB%E3%83%AB/"'));
 });
 
 test("title と meta の値はエスケープする", () => {
   const [entry] = fixtureArticles;
   const tricky = { ...entry, title: `A&B "引用" <script>`, summary: `要約 <b>"x"</b> & 'y'` };
   const site = buildFixtureSite({ articles: [tricky] });
-  const { html } = pageFor(site, "wiki/国/アクセル/index.html");
+  const { html } = pageFor(site, "article/国/アクセル/index.html");
   assert.ok(html.includes("<title>A&amp;B &quot;引用&quot; &lt;script&gt; - 出界百科</title>"));
   assert.equal(metaContent(html, "property", "og:title"), "A&amp;B &quot;引用&quot; &lt;script&gt;");
   assert.equal(metaContent(html, "name", "description"), "要約 &lt;b&gt;&quot;x&quot;&lt;/b&gt; &amp; &#39;y&#39;");
@@ -209,7 +209,7 @@ test("説明文は 120 字で切り、サロゲートペアの文字を割らな
 
 test("画像のある記事は og:image を絶対 URL で入れ、無い記事は入れない", () => {
   const site = buildFixtureSite();
-  const withImage = pageFor(site, "wiki/国/アクセル/index.html").html;
+  const withImage = pageFor(site, "article/国/アクセル/index.html").html;
   assert.equal(
     metaContent(withImage, "property", "og:image"),
     `${SITE_URL}content/${encodeURIComponent("画像")}/${encodeURIComponent("アクセル地図.png")}`
@@ -219,7 +219,7 @@ test("画像のある記事は og:image を絶対 URL で入れ、無い記事�
   assert.equal(metaContent(withImage, "property", "og:image:alt"), "アクセル地図");
   assert.equal(metaContent(withImage, "name", "twitter:card"), "summary_large_image");
 
-  const withoutImage = pageFor(site, "wiki/出界/index.html").html;
+  const withoutImage = pageFor(site, "article/出界/index.html").html;
   assert.doesNotMatch(withoutImage, /og:image/);
   assert.equal(metaContent(withoutImage, "name", "twitter:card"), "summary");
 });
@@ -239,7 +239,7 @@ test("og:image には大きすぎる画像を使わず、インフォボック�
   assert.equal(pickRepresentativeImage(bodyOnly, { imageByteSizes: { "big.png": OG_IMAGE_MAX_BYTES + 1, "small.png": OG_IMAGE_MAX_BYTES + 1 } }), null);
 
   const site = buildFixtureSite({ imageByteSizes: { "画像/アクセル地図.png": OG_IMAGE_MAX_BYTES + 1 } });
-  assert.doesNotMatch(pageFor(site, "wiki/国/アクセル/index.html").html, /og:image/);
+  assert.doesNotMatch(pageFor(site, "article/国/アクセル/index.html").html, /og:image/);
 });
 
 test("本文は SPA と同じ renderArticlePage の出力で、変えるのはリンク先だけ", () => {
@@ -247,7 +247,7 @@ test("本文は SPA と同じ renderArticlePage の出力で、変えるのは�
   setImageSizes(imageSizes);
   const graph = buildWikiGraph(fixtureArticles);
   const rendered = renderArticlePage(buildArticlePageModel(graph, "国/アクセル"));
-  const body = detailViewHtml(pageFor(site, "wiki/国/アクセル/index.html").html);
+  const body = detailViewHtml(pageFor(site, "article/国/アクセル/index.html").html);
 
   assert.equal(
     body,
@@ -263,9 +263,9 @@ test("本文は SPA と同じ renderArticlePage の出力で、変えるのは�
 
 test("静的ページのリンクは静的ページどうしをつなぎ、静的ページの無い画面は SPA へ向ける", () => {
   const site = buildFixtureSite();
-  const body = detailViewHtml(pageFor(site, "wiki/国/アクセル/index.html").html);
+  const body = detailViewHtml(pageFor(site, "article/国/アクセル/index.html").html);
   const hrefs = [...body.matchAll(/href="([^"]*)"/g)].map((match) => match[1]);
-  const world = "../../../wiki/%E5%87%BA%E7%95%8C/";
+  const world = "../../../article/%E5%87%BA%E7%95%8C/";
 
   // 記事へのリンク・見出しへのリンク
   assert.ok(hrefs.includes(world));
@@ -283,7 +283,7 @@ test("静的ページのリンクは静的ページどうしをつなぎ、静�
     assert.ok(body.includes(`id="${href.slice(1)}"`));
   }
   // 固定リンクは自分自身、画像はサイト直下の content/
-  assert.ok(hrefs.includes(`../../../wiki/${encodeURIComponent("国")}/${encodeURIComponent("アクセル")}/`));
+  assert.ok(hrefs.includes(`../../../article/${encodeURIComponent("国")}/${encodeURIComponent("アクセル")}/`));
   assert.ok(body.includes(`src="../../../content/${encodeURIComponent("画像")}/${encodeURIComponent("アクセル地図.png")}"`));
   // SPA のハッシュ (#!article/…) はもう残らない
   assert.ok(hrefs.every((href) => !href.startsWith("#!")));

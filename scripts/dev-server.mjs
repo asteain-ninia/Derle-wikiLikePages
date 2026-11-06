@@ -71,7 +71,7 @@ async function resolveFilePath(absolutePath) {
   }
 }
 
-// 記事・カテゴリの静的ページ (本番は npm run build:site が dist/wiki/… に書き出す) を、開発中はその場で組み立てて返す。
+// 記事・カテゴリの静的ページ (本番は npm run build:site が dist/article/… に書き出す) を、開発中はその場で組み立てて返す。
 // 記事データ (content-data.js) が作り直されるたびに読み直す。描画関数 (renderers.js など) を書き換えたときは
 // SPA は再読み込みで反映されるが、静的ページはこのサーバーを起動し直すまで古いまま
 const generatedDataPath = path.join(projectRoot, "src", "data", "generated", "content-data.js");
@@ -98,7 +98,7 @@ async function loadDevStaticSite(origin) {
 
 async function findDevStaticPage(requestUrl) {
   const pathname = decodeURIComponent(requestUrl.pathname);
-  if (!/^\/(wiki|category)\//.test(pathname)) {
+  if (!/^\/(article|category)\//.test(pathname)) {
     return null;
   }
   const filePath = `${pathname.replace(/^\/+/, "").replace(/\/?(index\.html)?$/, "")}/index.html`;
