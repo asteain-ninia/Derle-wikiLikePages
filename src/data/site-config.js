@@ -1,4 +1,8 @@
 export const siteConfig = {
+  siteName: "出界百科",
+  // 公開サイトの URL (末尾は /)。記事の静的ページの canonical・OGP・sitemap.xml の絶対 URL に使う。
+  // ビルド時に環境変数 SITE_URL があればそちらを使う (GitHub Actions は Pages の設定から渡す)
+  siteUrl: "https://asteain-ninia.github.io/Derle-wikiLikePages/",
   preferredFeaturedId: "",
   newArticleLimit: 4,
   recentUpdateLimit: 4,

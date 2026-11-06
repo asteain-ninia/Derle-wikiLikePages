@@ -217,6 +217,20 @@ export function buildDisambiguationHref(title) {
   return `#!disambiguation/${encodeURIComponent(title)}`;
 }
 
+// 記事・カテゴリごとの静的ページ (npm run build:site が dist/ に書き出す) の、サイト直下からの URL。
+// 名前の / はそのままフォルダの区切りにし、区切りごとに encodeURIComponent する。末尾は / (中身は index.html)
+export function buildStaticArticleHref(entryId) {
+  return buildStaticHref("article", entryId);
+}
+
+export function buildStaticCategoryHref(categoryName) {
+  return buildStaticHref("category", categoryName);
+}
+
+function buildStaticHref(rootDirectory, name) {
+  return `${rootDirectory}/${String(name).split("/").map(encodeURIComponent).join("/")}/`;
+}
+
 export function buildSectionAnchorId(heading) {
   return `section-${encodeURIComponent(heading).replace(/%/g, "-").toLowerCase()}`;
 }

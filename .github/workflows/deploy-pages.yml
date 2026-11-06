@@ -31,6 +31,7 @@ jobs:
           node-version: 24
 
       - name: Configure GitHub Pages
+        id: pages
         uses: actions/configure-pages@v5
 
       - name: Run tests
@@ -38,6 +39,9 @@ jobs:
 
       - name: Build static site
         run: npm run build:site
+        env:
+          # 静的ページの canonical・OGP・sitemap.xml に使う公開 URL (独自ドメインにしても追従する)
+          SITE_URL: ${{ steps.pages.outputs.base_url }}
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
