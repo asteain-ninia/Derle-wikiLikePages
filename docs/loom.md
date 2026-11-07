@@ -2,7 +2,7 @@
 
 世界織機（Artifexian「The WorldSmith」の翻訳版。Google スプレッドシート）に頼っていた計算を、公開の物理式から組み直したもの。コードは `src/lib/loom/`、較正テストは `tests/loom.test.js`。
 
-何を計算するかの着想は Artifexian の The WorldSmith（v8.0）から得た。式とコードはそこから写しておらず、上の文献から組み直している。The WorldSmith には利用条件が書かれていない（2026-11-07 時点。作者サイト・Patreon・Bluesky・X を確認）。
+何を計算するかの着想は Artifexian の The WorldSmith（v8.0）から得た。式とコードはそこから写しておらず、上の文献から組み直している。The WorldSmith の利用条件は見つかっていない（2026-11-07 時点。シート本体・作者サイト・Patreon の作者ページ・Bluesky・X には記載なし。Patreon の WorldSmith の投稿と YouTube の説明文は取得できず未確認）。
 
 ## 方針
 
@@ -57,7 +57,7 @@
 | 質量半径関係 | R = 0.438M² + 0.479M + 0.075（≤ 1.5 M☉） | Eker ほか 2018 | 織機の R ∝ M^0.8 / M^0.57 は出典のはっきりしない経験則 |
 | 主系列の寿命 | 10 Gyr × M/L | Hansen & Kawaler 1994 | 同じ |
 | 有効温度 | シュテファン=ボルツマン、太陽 5772 K | IAU 2015 Resolution B3（Prša ほか 2016, AJ 152, 41） | 織機は 5776 K |
-| スペクトル型 | 主系列星の型と温度の表を補間 | Pecaut & Mamajek 2013, ApJS 208, 9（Mamajek の表 2022.04.16 版） | 織機は古い境界温度で、型の中を等分していた |
+| スペクトル型 | 主系列星の型と温度の表を補間 | Pecaut & Mamajek 2013, ApJS 208, 9、Pecaut, Mamajek & Bubar 2012, ApJ 756, 154（Mamajek の表 2022.04.16 版。表が両方の引用を求めている） | 織機は古い境界温度で、型の中を等分していた |
 | 生命居住可能領域 | S_eff の四次式（暴走温室効果〜最大温室効果） | Kopparapu ほか 2014, ApJL 787, L29（著者公開の係数） | 織機の √(L/1.1)・√(L/0.53) は Kasting ほか 1993 の「保守的な限界」（水の喪失・CO₂ の凝結開始）で、暴走・最大温室効果ではない |
 | 雪線 | 2.7·√L AU（凝結温度 170 K） | Hayashi 1981 | 織機の 4.85·√L は文献が見つからない（ゲーム由来の可能性） |
 | 岩石惑星の質量半径 | R = (1.07 − 0.21·CMF)·M^(1/3.7) | Zeng, Sasselov & Jacobsen 2016, ApJ 819, 127 | 同じ式。適用範囲は 1〜8 M⊕・CMF 0〜0.4 |
@@ -67,7 +67,7 @@
 | ヒル半径 | a·(m/3M)^(1/3) | Hill 1878、Murray & Dermott 1999 | 同じ（織機は 1 AU などを丸めていた） |
 | 潮汐固定の時間 | ω·a⁶·I·Q / (3G·m²·k₂·R⁵) | Gladman ほか 1996, Icarus 122, 166（Peale 1977） | 同じ式。Q を地球 13 → 12（Williams ほか 1978）、月 40 → 37（Williams ほか 2001） |
 | ラブ数 k₂ | 1.5 / (1 + 19μ / 2ρgR) | Love 1911、Murray & Dermott 1999 | 同じ |
-| 水の密度（talk の基準） | 0〜40 ℃ の経験式 | Tanaka ほか 2001, Metrologia 38, 301 | 織機にはない |
+| 水の密度（talk の基準） | 0〜40 ℃ の経験式 | Tanaka ほか 2001, Metrologia 38, 301–309, doi:10.1088/0026-1394/38/4/3 | 織機にはない |
 
 物理定数は CODATA 2018、太陽と地球の公称値は IAU 2015 Resolution B3、天文単位は IAU 2012 Resolution B2。
 
