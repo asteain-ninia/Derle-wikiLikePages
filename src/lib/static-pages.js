@@ -249,7 +249,12 @@ ${renderMetaTags({ siteName, title, description, canonicalUrl, ogType, image, pu
     </div>
 
     <section class="detail-view" id="detail-view">${bodyHtml}</section>
-  </main>
+  </main>${
+    // 静的ページは原則 JavaScript を読まない。例外として、計算機のあるページだけ計算機のスクリプトを読む
+    bodyHtml.includes("data-loom-calc")
+      ? `\n  <script type="module" src="${escapeHtml(rootPrefix)}src/loom-page.js"></script>`
+      : ""
+  }
 </body>
 </html>
 `;

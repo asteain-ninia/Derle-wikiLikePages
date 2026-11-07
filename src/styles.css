@@ -1001,3 +1001,56 @@ html[data-file-protocol="true"] .protocol-warning {
   max-width: 100%;
   height: auto;
 }
+
+/* 出界の織機の計算機 ({{計算機|…}}) */
+.loom-calc {
+  margin: 1em 0;
+  padding: 0.75em 1em;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-soft);
+  max-width: 44em;
+}
+
+.loom-calc--error {
+  color: #b32424;
+}
+
+.loom-calc__title {
+  margin: 0 0 0.5em;
+  font-weight: bold;
+}
+
+.loom-calc__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5em 1em;
+  margin: 0.5em 0;
+}
+
+.loom-calc__controls input[type="number"] {
+  width: 7em;
+}
+
+.loom-calc__controls output {
+  font-weight: bold;
+}
+
+.loom-calc__now {
+  margin: 0 0 0.5em;
+}
+
+.loom-calc__table {
+  margin: 0.5em 0;
+}
+
+.loom-calc__table td {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.loom-calc__note {
+  margin: 0.5em 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.875em;
+}

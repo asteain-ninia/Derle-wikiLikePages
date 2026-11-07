@@ -82,3 +82,14 @@ export function earthToLocal(date, { dayEarthSeconds, yearLocalDays }, div = DEF
 
   return { elapsedDays, year: epoch.year + yearOffset, dayOfYear, hour, minute, second };
 }
+
+// 出星の時刻 → 地球の時刻 (Date)。earthToLocal の逆
+export function localToEarth(local, { dayEarthSeconds, yearLocalDays }, div = DEFAULT_DIVISIONS, epoch = EPOCH) {
+  const units = timeUnits(dayEarthSeconds, div);
+  const toDayFraction = (h, m, s) => ((h * div.minutesPerHour + m) * div.secondsPerMinute + s) / units.secondsPerDay;
+  const epochDays = epoch.dayOfYear - 1 + toDayFraction(epoch.hour, epoch.minute, epoch.second);
+  const totalDays =
+    (local.year - epoch.year) * yearLocalDays + (local.dayOfYear - 1) + toDayFraction(local.hour, local.minute, local.second);
+  const elapsedDays = totalDays - epochDays;
+  return new Date(Date.parse(epoch.earthIso) + elapsedDays * dayEarthSeconds * 1000);
+}

@@ -1,4 +1,5 @@
 import { formatDisplayDate } from "./home-page-model.js";
+import { renderLoomCalculator } from "./loom/widgets.js";
 import {
   buildArticleHref,
   buildDisambiguationHref,
@@ -485,6 +486,12 @@ function renderSectionParagraphs(paragraphs) {
     if (segments && typeof segments === "object" && !Array.isArray(segments) && segments.type === "definition-list") {
       flushList();
       parts.push(renderDefinitionList(segments));
+      continue;
+    }
+
+    if (segments && typeof segments === "object" && !Array.isArray(segments) && segments.type === "calculator") {
+      flushList();
+      parts.push(renderLoomCalculator(segments.kind));
       continue;
     }
 

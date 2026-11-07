@@ -31,6 +31,8 @@ import {
   setImageSizes,
 } from "./lib/renderers.js";
 
+import { mountLoomCalculators } from "./lib/loom/widgets.js";
+
 const SITE_NAME = siteConfig.siteName;
 
 setImageSizes(imageSizes);
@@ -230,6 +232,7 @@ function renderDetailView(route) {
       : renderNotFoundPage(route.entryId);
 
     if (pageModel) {
+      mountLoomCalculators(elements.detailView);
       requestAnimationFrame(() => {
         scrollToArticleSection(route.sectionHeading);
       });
