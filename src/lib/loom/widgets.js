@@ -4,7 +4,7 @@
 
 import { getDerleSystem } from "./system.js";
 import { convertFromSi, convertToSi, formatNumber } from "./quantities.js";
-import { earthToLocal, localToEarth, EPOCH } from "./calendar.js";
+import { earthToLocal, localToEarth, monthsInYear, EPOCH } from "./calendar.js";
 
 const UNIT_DIMENSIONS = ["長さ", "質量", "温度", "圧力", "加速度", "密度", "速さ", "時間"];
 const DEFAULTS = { dimension: "長さ", value: 1, unit: "pasqil" };
@@ -75,9 +75,18 @@ function timeParams() {
 
 const pad = (n) => String(n).padStart(2, "0");
 
+export function formatLocalDate(local) {
+  if (local.monthless) {
+    return local.month === monthsInYear(local.year)
+      ? `シェル暦 ${local.year} 年 年末の月なしの日`
+      : `シェル暦 ${local.year} 年 ${local.month} 月と ${local.month + 1} 月のあいだの月なしの日`;
+  }
+  return `シェル暦 ${local.year} 年 ${local.month} 月 ${local.day} 日 (週の ${local.weekday + 1} 日目)`;
+}
+
 export function formatLocalTime(local) {
   // 39.9999… 秒を 39 秒と切り捨てないよう、ごくわずかに足してから切り捨てる
-  return `シェル暦 ${local.year} 年の ${local.dayOfYear} 日目 ${local.hour} 時 ${pad(local.minute)} 分 ${pad(Math.floor(local.second + 1e-6))} 秒`;
+  return `${formatLocalDate(local)} ${local.hour} 時 ${pad(local.minute)} 分 ${pad(Math.floor(local.second + 1e-6))} 秒`;
 }
 
 function formatEarthTime(date) {
@@ -99,14 +108,16 @@ function renderTimeCalculator() {
       </div>
       <div class="loom-calc__controls">
         <label>年 <input type="number" data-role="year" value="${local.year}"></label>
-        <label>日目 <input type="number" min="1" data-role="day" value="${local.dayOfYear}"></label>
+        <label>月 <input type="number" min="1" max="14" data-role="month" value="${local.month}"></label>
+        <label>日 <input type="number" min="1" max="28" data-role="day" value="${local.day ?? 1}"></label>
+        <label><input type="checkbox" data-role="monthless"> この月の後の月なしの日</label>
         <label>時 <input type="number" min="0" data-role="hour" value="${local.hour}"></label>
         <label>分 <input type="number" min="0" data-role="minute" value="${local.minute}"></label>
         <label>秒 <input type="number" min="0" data-role="second" value="${Math.floor(local.second + 1e-6)}"></label>
         <span class="loom-calc__arrow">→</span>
         <output data-role="local-result">${escapeHtml(formatEarthTime(epochDate))}</output>
       </div>
-      <p class="loom-calc__note">地球の時刻は、入力欄ではこの端末の時間帯、結果は協定世界時 (UTC) で示す。暦の月と閏年の規則が決まるまで、年は平均の一年 (惑星日 ${escapeHtml(formatNumber(timeParams().yearLocalDays, 10))} 日) で数えた近似。</p>
+      <p class="loom-calc__note">地球の時刻は、入力欄ではこの端末の時間帯、結果は協定世界時 (UTC) で示す。シェル暦は一か月 28 日・平年 14 か月、月と月のあいだに月なしの日を置き、53 年に 1 度 13 か月の年がある (仮決め)。過去の改暦は入っていないので、遠い昔の日付は現行の規則をさかのぼって当てはめた値。</p>
     </div>`;
 }
 
@@ -135,14 +146,17 @@ function mountTimeCalculator(root) {
     if (Number.isNaN(date.getTime())) return;
     earthResult.textContent = formatLocalTime(earthToLocal(date, params));
   };
+  const LOCAL_FIELDS = ["year", "month", "day", "hour", "minute", "second"];
   const updateLocal = () => {
-    const local = Object.fromEntries(["year", "day", "hour", "minute", "second"].map((role) => [role, Number(field(role).value)]));
+    const local = Object.fromEntries(LOCAL_FIELDS.map((role) => [role, Number(field(role).value)]));
     if (Object.values(local).some((v) => !Number.isFinite(v))) return;
-    const date = localToEarth(
-      { year: local.year, dayOfYear: local.day, hour: local.hour, minute: local.minute, second: local.second },
-      params
-    );
-    localResult.textContent = Number.isNaN(date.getTime()) ? "—" : formatEarthTime(date);
+    try {
+      const date = localToEarth({ ...local, monthless: field("monthless").checked }, params);
+      localResult.textContent = Number.isNaN(date.getTime()) ? "—" : formatEarthTime(date);
+    } catch (error) {
+      // 13 か月の年の 14 月、年の変わり目の月なしの日など、ない日付
+      localResult.textContent = `（${error.message}）`;
+    }
   };
 
   // 入力欄の初期値をいまの時刻にする
@@ -152,7 +166,8 @@ function mountTimeCalculator(root) {
   updateEarth();
 
   earthInput.addEventListener("input", updateEarth);
-  for (const role of ["year", "day", "hour", "minute", "second"]) field(role).addEventListener("input", updateLocal);
+  for (const role of LOCAL_FIELDS) field(role).addEventListener("input", updateLocal);
+  field("monthless").addEventListener("change", updateLocal);
 }
 
 // ── 入口 ────────────────────────────────

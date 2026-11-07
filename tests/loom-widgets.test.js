@@ -57,7 +57,7 @@ test("計算機の HTML は JavaScript なしでも例の値を含む", () => {
   const html = renderLoomCalculator("単位");
   assert.match(html, /data-loom-calc="単位"/);
   assert.match(html, /<th scope="row">km<\/th><td>1,123\.00<\/td>/);
-  assert.match(renderLoomCalculator("時刻"), /シェル暦 2551 年の 9 日目 3 時 26 分 40 秒/);
+  assert.match(renderLoomCalculator("時刻"), /シェル暦 2551 年 1 月 9 日 \(週の 2 日目\) 3 時 26 分 40 秒/);
   assert.match(renderLoomCalculator("ない"), /計算機「ない」はありません/);
 });
 
@@ -69,10 +69,42 @@ test("静的ページは計算機があるときだけスクリプトを読む",
 
 test("出星の時刻と地球の時刻は行き来できる", () => {
   const { system } = getDerleSystem();
-  const params = { dayEarthSeconds: system.planet.secondsPerDay, yearLocalDays: system.planet.yearLocalDays };
-  const date = new Date("2026-11-08T12:34:56Z");
-  const back = localToEarth(earthToLocal(date, params), params);
-  assert.ok(Math.abs(back.getTime() - date.getTime()) < 1, `${back.toISOString()}`);
+  const params = { dayEarthSeconds: system.planet.secondsPerDay };
+  for (const iso of ["2026-11-08T12:34:56Z", "1900-01-01T00:00:00Z", "2300-06-15T18:00:00Z"]) {
+    const date = new Date(iso);
+    const back = localToEarth(earthToLocal(date, params), params);
+    assert.ok(Math.abs(back.getTime() - date.getTime()) < 1, `${iso} → ${back.toISOString()}`);
+  }
+});
+
+test("シェル暦: 年の境目・月なしの日・月を抜く年", async () => {
+  const cal = await import("../src/lib/loom/calendar.js");
+  const { system } = getDerleSystem();
+  const params = { dayEarthSeconds: system.planet.secondsPerDay };
+  const at = (local) => cal.earthToLocal(cal.localToEarth({ hour: 0, minute: 0, second: 0, ...local }, params), params);
+
+  // 年の 1 日目 0 時は、前の年の最後の日にならない (レビュー指摘 1)
+  const newYear = at({ year: 2552, month: 1, day: 1 });
+  assert.deepEqual([newYear.year, newYear.month, newYear.day, newYear.hour, newYear.minute], [2552, 1, 1, 0, 0]);
+
+  // 月なしの日は月にも週にも属さない
+  const monthless = at({ year: 2551, month: 3, monthless: true });
+  assert.deepEqual([monthless.month, monthless.day, monthless.monthless, monthless.weekday], [3, null, true, null]);
+  const next = at({ year: 2551, month: 4, day: 1 });
+  assert.equal(next.dayOfYear, monthless.dayOfYear + 1);
+
+  // 平年 405 日、月を抜く年 376 日。2596 は月を抜く年 (2596 ÷ 53 の余りが 52)
+  assert.equal(cal.yearLength(2551), 405);
+  assert.equal(cal.isShortYear(2596), true);
+  assert.equal(cal.yearLength(2596), 376);
+  assert.throws(() => cal.localToEarth({ year: 2596, month: 14, day: 1, hour: 0, minute: 0, second: 0 }, params), RangeError);
+  // 年の変わり目には月なしの日がない
+  assert.throws(() => cal.localToEarth({ year: 2551, month: 14, monthless: true, hour: 0, minute: 0, second: 0 }, params), RangeError);
+
+  // 53 年でちょうど 21,436 日
+  let days = 0;
+  for (let y = 2544; y < 2597; y += 1) days += cal.yearLength(y);
+  assert.equal(days, 21436);
 });
 
 test("数の表示", () => {
