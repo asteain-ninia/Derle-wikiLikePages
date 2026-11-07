@@ -13,6 +13,9 @@ test("{{織機|量|単位|桁}} はビルド時の計算値になる", () => {
   assert.equal(expandLoomTemplates("{{織機|惑星の半径|pasqil|4}}"), "5.950");
   assert.equal(expandLoomTemplates("{{織機|地表平均温度|gal}}"), "59.01");
   assert.equal(expandLoomTemplates("{{織機|朔望月|日|5}}"), "28.929");
+  // 「地球の重力」は惑星の重力の地球比と同じ基準
+  const { system } = getDerleSystem();
+  assert.equal(expandLoomTemplates("{{織機|表面重力|地球の重力|6}}"), formatNumber(system.planet.gravity, 6));
 });
 
 test("{{織機}} の誤りは目に見える印になる", () => {

@@ -2,7 +2,7 @@
 // 記事の {{織機|量|単位|有効数字}} と、計算機の単位換算の両方がここを使う。
 // 値はすべて SI (温度は K) で持ち、単位で割って表示する。
 
-import { AU_M, EARTH, MOON, SUN } from "./constants.js";
+import { AU_M, EARTH, G, MOON, SUN } from "./constants.js";
 import { LENGTH_UNITS, TALK_KG, derivedUnits, kelvinToGal, galToCelsius } from "./units.js";
 
 // 単位: factor は SI に掛ける倍率の逆 (SI 値 ÷ factor = その単位での値)。温度だけは変換関数を持つ。
@@ -43,7 +43,10 @@ export function buildUnits(system) {
     },
     加速度: {
       "m/s²": 1,
-      g: EARTH.gravity,
+      // 地球の重力 = GM⊕/R⊕² ≒ 9.820 m/s² (惑星の「重力の地球比」と同じ基準)。
+      // 標準重力 g₀ = 9.80665 m/s² は自転の遠心力などを含めた慣用値で、別の単位にする
+      地球の重力: (G * EARTH.mass) / EARTH.radius ** 2,
+      標準重力: EARTH.gravity,
       "Qarli/秒²": derived.accelerationQarli,
       "firqil/秒²": derived.accelerationQarli * 100,
     },
