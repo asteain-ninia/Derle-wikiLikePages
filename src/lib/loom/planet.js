@@ -55,6 +55,13 @@ export function surfaceTemperature(luminositySolar, albedo, distanceAu, greenhou
   return ((teq ** 4 * (1 + (3 * tau) / 4)) / opts.emissivity) ** 0.25;
 }
 
+// 地表温度を決めたときに、それを実現する温室効果の倍率 (地球の τ に掛ける値) を逆算する
+export function greenhouseForTemperature(targetK, luminositySolar, albedo, distanceAu, opts = GREENHOUSE_DEFAULTS) {
+  const teq = equilibriumTemperature(luminositySolar, albedo, distanceAu);
+  const tau = (4 / 3) * ((opts.emissivity * targetK ** 4) / teq ** 4 - 1);
+  return tau / opts.tauEarth;
+}
+
 // 惑星が受ける主星の光 (地球が太陽から受ける量 = 1)
 export function insolation(luminositySolar, distanceAu) {
   return luminositySolar / distanceAu ** 2;
@@ -86,8 +93,9 @@ export function airDensity(pressurePa, molarMass, temperatureK) {
 // 惑星をまとめて計算する。
 // 半径は radius (地球比) を直接与えるか、cmf (0〜1) から求める。
 // 軌道は semiMajorAxis [AU] を与えるか、yearEarthDays (一年の長さ) から逆算する。
+// 地表温度は surfaceTempK を与えると温室効果の倍率を逆算し、与えなければ greenhouse (倍率) から計算する。
 export function computePlanet(input, star) {
-  const { mass, obliquity, dayHours, albedo, greenhouse = 1, eccentricity, inclination = 0 } = input;
+  const { mass, obliquity, dayHours, albedo, eccentricity, inclination = 0 } = input;
 
   const radius = input.radius ?? radiusFromMassAndCmf(mass, input.cmf);
   const cmf = input.cmf ?? cmfFromMassAndRadius(mass, radius);
@@ -101,6 +109,10 @@ export function computePlanet(input, star) {
   const yearEarthDays = input.yearEarthDays ?? periodYears * EARTH.siderealYearDays;
   const dayEarthDays = dayHours / 24;
 
+  const greenhouse =
+    input.surfaceTempK !== undefined
+      ? greenhouseForTemperature(input.surfaceTempK, star.luminosity, albedo, semiMajorAxis)
+      : input.greenhouse ?? 1;
   const surfaceTempK = surfaceTemperature(star.luminosity, albedo, semiMajorAxis, greenhouse);
 
   const result = {
@@ -130,6 +142,8 @@ export function computePlanet(input, star) {
     yearLocalDays: yearEarthDays / dayEarthDays,
     insolation: insolation(star.luminosity, semiMajorAxis),
     equilibriumTempK: equilibriumTemperature(star.luminosity, albedo, semiMajorAxis),
+    albedo,
+    greenhouse,
     surfaceTempK,
     horizonKm: horizonDistance(radiusM, input.observerHeight ?? 1.75) / 1000,
     secondsPerDay: dayHours * 3600,

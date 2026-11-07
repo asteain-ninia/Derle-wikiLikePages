@@ -53,8 +53,9 @@ export function tidalAcceleration(perturberMassKg, radiusM, distanceM) {
 export function computeMoon(input, planet, star, opts = TIDAL_DEFAULTS) {
   const { mass, semiMajorAxisKm, eccentricity, inclination = 0 } = input;
   const massKg = mass * MOON.mass;
-  const density = input.density ?? (input.radius ? (mass / input.radius ** 3) * MOON.density : MOON.density);
-  const radius = input.radius ?? Math.cbrt(mass / (density / MOON.density));
+  // 半径は radius (月比) か、densityRatio (月比の密度) から求める。密度の絶対値は density [g/cm³] でも渡せる
+  const radius = input.radius ?? Math.cbrt(mass / (input.densityRatio ?? (input.density ?? MOON.density) / MOON.density));
+  const density = input.density ?? (mass / radius ** 3) * MOON.density;
   const radiusM = radius * MOON.radius;
   const gravityMs2 = (G * massKg) / radiusM ** 2;
   const aM = semiMajorAxisKm * 1000;
