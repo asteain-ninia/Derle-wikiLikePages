@@ -49,7 +49,8 @@ export function derivedUnits(localSecondInEarthSeconds) {
     Dik: dik,
     mos: dik / QARLI_M ** 2, // 圧力 [Pa]
     Saza: dik * QARLI_M, // 仕事 [J]
-    tylostConstant: ((TALK_KG * 1000) / 1.008) * 6.02214076e23, // ¹H 1 talk あたりの原子数
+    // 水素 1 talk あたりの原子数。原案どおり水素の標準原子量 1.008 (天然の同位体比) を使う。¹H だけなら 1.00783
+    tylostConstant: ((TALK_KG * 1000) / 1.008) * 6.02214076e23,
     accelerationQarli: QARLI_M / s ** 2, // 1 Qarli/秒² [m/s²]
   };
 }

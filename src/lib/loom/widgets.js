@@ -93,16 +93,16 @@ function renderTimeCalculator() {
       <p class="loom-calc__title">地球の時刻と出星の時刻</p>
       <p class="loom-calc__now" data-role="now">基準点: ${escapeHtml(formatEarthTime(epochDate))} ＝ ${escapeHtml(formatLocalTime(local))}</p>
       <div class="loom-calc__controls">
-        <label>地球の時刻 <input type="datetime-local" step="1" data-role="earth" value="2018-04-29T09:00:00"></label>
+        <label>地球の時刻 <input type="datetime-local" step="1" data-role="earth"></label>
         <span class="loom-calc__arrow">→</span>
-        <output data-role="earth-result">${escapeHtml(formatLocalTime(local))}</output>
+        <output data-role="earth-result">—</output>
       </div>
       <div class="loom-calc__controls">
         <label>年 <input type="number" data-role="year" value="${local.year}"></label>
         <label>日目 <input type="number" min="1" data-role="day" value="${local.dayOfYear}"></label>
         <label>時 <input type="number" min="0" data-role="hour" value="${local.hour}"></label>
         <label>分 <input type="number" min="0" data-role="minute" value="${local.minute}"></label>
-        <label>秒 <input type="number" min="0" data-role="second" value="${Math.round(local.second)}"></label>
+        <label>秒 <input type="number" min="0" data-role="second" value="${Math.floor(local.second + 1e-6)}"></label>
         <span class="loom-calc__arrow">→</span>
         <output data-role="local-result">${escapeHtml(formatEarthTime(epochDate))}</output>
       </div>
@@ -165,7 +165,7 @@ const CALCULATORS = {
 export const CALCULATOR_KINDS = Object.keys(CALCULATORS);
 
 export function renderLoomCalculator(kind) {
-  const calc = CALCULATORS[kind];
+  const calc = Object.hasOwn(CALCULATORS, kind) ? CALCULATORS[kind] : null;
   if (!calc) {
     return `<p class="loom-calc loom-calc--error">〔計算機「${escapeHtml(kind)}」はありません。使えるのは ${CALCULATOR_KINDS.join("・")}〕</p>`;
   }
@@ -175,8 +175,9 @@ export function renderLoomCalculator(kind) {
 export function mountLoomCalculators(root) {
   for (const element of root.querySelectorAll("[data-loom-calc]")) {
     if (element.dataset.loomMounted) continue;
-    const calc = CALCULATORS[element.dataset.loomCalc];
-    if (!calc) continue;
+    const kind = element.dataset.loomCalc;
+    if (!Object.hasOwn(CALCULATORS, kind)) continue;
+    const calc = CALCULATORS[kind];
     element.dataset.loomMounted = "true";
     calc.mount(element);
   }

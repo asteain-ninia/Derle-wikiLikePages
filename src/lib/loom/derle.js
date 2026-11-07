@@ -74,6 +74,7 @@ export const DERLE_INPUT = {
   moon: {
     mass: 1.2733, // 月質量
     densityRatio: D.moonDensity, // 月比の密度 → 半径を出す
+    density: D.moonDensity * R.moonDensity, // 密度の絶対値 [g/cm³] (ロッシュ限界に使う)
     semiMajorAxisKm: D.moonSemiMajorAxis * R.moonSemiMajorAxisKm,
     eccentricity: D.moonEccentricity * R.moonEccentricity,
     inclination: D.moonInclination * R.moonInclination,

@@ -20,7 +20,28 @@ test("{{織機|量|単位|桁}} はビルド時の計算値になる", () => {
 
 test("{{織機}} の誤りは目に見える印になる", () => {
   assert.match(expandLoomTemplates("{{織機|ない量|km}}"), /〔織機: 量「ない量」はありません〕/);
-  assert.match(expandLoomTemplates("{{織機|惑星の半径|kg}}"), /〔織機: 「長さ」に単位「kg」はありません〕/);
+  assert.match(expandLoomTemplates("{{織機|惑星の半径|kg}}"), /「長さ」に単位「kg」はありません/);
+});
+
+test("組み込みの名前 (constructor など) でもビルドが止まらない", () => {
+  for (const name of ["constructor", "toString", "__proto__"]) {
+    assert.match(expandLoomTemplates(`{{織機|${name}|km}}`), /〔織機: 量「.+」はありません〕/);
+    assert.match(expandLoomTemplates(`{{織機|惑星の半径|${name}}}`), /単位「.+」はありません/);
+    assert.match(renderLoomCalculator(name), /計算機「.+」はありません/);
+  }
+});
+
+test("有効数字の欄の前後の空白は無視する", () => {
+  assert.equal(expandLoomTemplates("{{織機|惑星の半径|km| 6 }}"), "6,682.34");
+});
+
+test("行に単独でない {{計算機}} は印になり、内部の印が本文に漏れない", () => {
+  for (const src of ["* {{計算機|単位}}", "前の文 {{計算機|単位}} 後の文"]) {
+    const expanded = expandLoomTemplates(src);
+    assert.ok(!expanded.includes("\x00"), JSON.stringify(expanded));
+    assert.match(expanded, /〔計算機「単位」は行に単独で書く〕/);
+  }
+  assert.ok(expandLoomTemplates("  {{計算機|単位}}  ").includes("\x00CALC:単位\x00"));
 });
 
 test("{{計算機|種類}} の行は計算機のブロックになる", () => {
@@ -59,4 +80,16 @@ test("数の表示", () => {
   assert.equal(formatNumber(7.101e24, 4), "7.101×10²⁴");
   assert.equal(formatNumber(0.0001234, 3), "1.23×10⁻⁴");
   assert.equal(formatNumber(0.10424, 4), "0.1042");
+  // 丸めで桁が繰り上がっても有効数字は増えない
+  assert.equal(formatNumber(9.9996, 4), "10.00");
+  assert.equal(formatNumber(999.96, 4), "1,000");
+});
+
+test("おかしな入力には警告が付く", async () => {
+  const { computeSystem } = await import("../src/lib/loom/index.js");
+  const { DERLE_INPUT } = await import("../src/lib/loom/derle.js");
+  const cold = computeSystem({ ...DERLE_INPUT, planet: { ...DERLE_INPUT.planet, surfaceTempK: 200 } });
+  assert.match(cold.planet.warnings.join(), /温室効果がマイナス/);
+  assert.deepEqual(computeSystem(DERLE_INPUT).planet.warnings, []);
+  assert.throws(() => computeSystem({ ...DERLE_INPUT, planet: { ...DERLE_INPUT.planet, obliquity: -10 } }), RangeError);
 });

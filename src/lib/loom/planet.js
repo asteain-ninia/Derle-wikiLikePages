@@ -19,6 +19,7 @@ export function cmfFromMassAndRadius(mass, radius) {
 
 // 回帰線と極圏の緯度 [°]。地軸の傾き ε が 90° を超える (逆行自転) ときは 180° − ε で考える。
 export function climateLatitudes(obliquity) {
+  if (!(obliquity >= 0 && obliquity <= 180)) throw new RangeError(`地軸の傾きは 0〜180° で与える (${obliquity})`);
   const eps = obliquity <= 90 ? obliquity : 180 - obliquity;
   return { tropic: eps, polarCircle: 90 - eps };
 }
@@ -115,7 +116,19 @@ export function computePlanet(input, star) {
       : input.greenhouse ?? 1;
   const surfaceTempK = surfaceTemperature(star.luminosity, albedo, semiMajorAxis, greenhouse);
 
+  // 計算はできるが物理的におかしい入力への警告 (気候推定の値を差し替えたときに気づけるように)
+  const warnings = [];
+  if (greenhouse < 0) {
+    warnings.push(`地表温度 ${surfaceTempK.toFixed(1)} K は放射平衡温度より低く、温室効果がマイナス (${greenhouse.toFixed(3)}) になっている`);
+  }
+  if (!(albedo >= 0 && albedo < 1)) warnings.push(`アルベド ${albedo} は 0 以上 1 未満にする`);
+  if (!(eccentricity >= 0 && eccentricity < 1)) warnings.push(`離心率 ${eccentricity} は 0 以上 1 未満にする`);
+  if (input.cmf !== undefined && !(input.cmf >= 0 && input.cmf <= 0.4)) {
+    warnings.push(`コア質量比 ${input.cmf} は Zeng ほか 2016 の適用範囲 (0〜0.4) の外`);
+  }
+
   const result = {
+    warnings,
     mass,
     massKg,
     radius,

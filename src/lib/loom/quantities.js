@@ -2,7 +2,7 @@
 // 記事の {{織機|量|単位|有効数字}} と、計算機の単位換算の両方がここを使う。
 // 値はすべて SI (温度は K) で持ち、単位で割って表示する。
 
-import { AU_M, EARTH, G, MOON, SUN } from "./constants.js";
+import { AU_M, EARTH, G, MOON, SUN, SECONDS_PER_YEAR } from "./constants.js";
 import { LENGTH_UNITS, TALK_KG, derivedUnits, kelvinToGal, galToCelsius } from "./units.js";
 
 // 単位: factor は SI に掛ける倍率の逆 (SI 値 ÷ factor = その単位での値)。温度だけは変換関数を持つ。
@@ -60,7 +60,7 @@ export function buildUnits(system) {
       地球分: 60,
       地球時間: 3600,
       地球日: 86_400,
-      地球年: EARTH.siderealYearDays * 86_400,
+      地球年: SECONDS_PER_YEAR, // ユリウス年 (365.25 日)。天文学で年・Gyr を数えるときの慣用
       秒: t.second,
       分: t.minute,
       時: t.hour,
@@ -88,7 +88,7 @@ export const QUANTITIES = {
   主星の光度: ["仕事率", (s) => s.star.luminosityW],
   主星の密度: ["密度", (s) => s.star.densityGcm3 * 1000],
   主星の有効温度: ["温度", (s) => s.star.teff],
-  主星の寿命: ["時間", (s) => s.star.lifetime * 1e9 * EARTH.siderealYearDays * 86_400],
+  主星の寿命: ["時間", (s) => s.star.lifetime * 1e9 * SECONDS_PER_YEAR],
   惑星の質量: ["質量", (s) => s.planet.massKg],
   惑星の半径: ["長さ", (s) => s.planet.radiusKm * 1000],
   惑星の密度: ["密度", (s) => s.planet.densityGcm3 * 1000],
@@ -113,18 +113,21 @@ export const QUANTITIES = {
   朔望月: ["時間", (s) => s.moon.synodicDays * 86_400],
 };
 
+// 表を名前で引く。constructor・toString・__proto__ などの組み込みの名前に引っかからないよう、自分の項目だけを見る
+function lookupUnit(units, dimension, unit) {
+  const table = Object.hasOwn(units, dimension) ? units[dimension] : null;
+  if (!table || !Object.hasOwn(table, unit)) throw new Error(`「${dimension}」に単位「${unit}」はありません`);
+  return table[unit];
+}
+
 // SI の値を、指定の単位での値に直す
 export function convertFromSi(units, dimension, value, unit) {
-  const table = units[dimension];
-  if (!table || !(unit in table)) throw new Error(`「${dimension}」に単位「${unit}」はありません`);
-  const u = table[unit];
+  const u = lookupUnit(units, dimension, unit);
   return typeof u === "object" ? u.from(value) : value / u;
 }
 
 export function convertToSi(units, dimension, value, unit) {
-  const table = units[dimension];
-  if (!table || !(unit in table)) throw new Error(`「${dimension}」に単位「${unit}」はありません`);
-  const u = table[unit];
+  const u = lookupUnit(units, dimension, unit);
   return typeof u === "object" ? u.to(value) : value * u;
 }
 
@@ -140,8 +143,10 @@ export function formatNumber(value, sig = 4) {
     const exp = String(Number(exponent)).replace(/./g, (ch) => SUPERSCRIPT[ch]);
     return `${mantissa}×10${exp}`;
   }
-  const digits = Math.max(0, sig - 1 - Math.floor(Math.log10(abs)));
-  const fixed = value.toFixed(digits);
+  // 先に有効数字で丸めてから桁を数える (9.9996 → 10.00 のような繰り上がりで桁が増えないように)
+  const rounded = Number(value.toPrecision(sig));
+  const digits = Math.max(0, sig - 1 - Math.floor(Math.log10(Math.abs(rounded))));
+  const fixed = rounded.toFixed(digits);
   const [intPart, fracPart] = fixed.split(".");
   const grouped = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   return fracPart ? `${grouped}.${fracPart}` : grouped;
@@ -149,15 +154,15 @@ export function formatNumber(value, sig = 4) {
 
 // 記事の {{織機|量|単位|有効数字}} 1 個ぶんを文字列にする。読めないときは目に見える印を返す
 export function formatQuantity(system, units, name, unit = "", sig = 4) {
-  const entry = QUANTITIES[name];
-  if (!entry) return `〔織機: 量「${name}」はありません〕`;
-  const [dimension, get] = entry;
-  const si = get(system);
-  if (si === undefined) return `〔織機: 「${name}」は計算されていません〕`;
-  const defaultUnit = Object.keys(units[dimension])[0];
+  if (!Object.hasOwn(QUANTITIES, name)) return `〔織機: 量「${name}」はありません〕`;
+  const [dimension, get] = QUANTITIES[name];
   try {
+    const si = get(system);
+    if (si === undefined || si === null) return `〔織機: 「${name}」は計算されていません〕`;
+    const defaultUnit = Object.keys(units[dimension])[0];
     return formatNumber(convertFromSi(units, dimension, si, unit || defaultUnit), sig);
   } catch (error) {
-    return `〔織機: ${error.message}〕`;
+    // 衛星がない系で衛星の量を引いたときなども、ビルドを止めずに印にする
+    return `〔織機: 「${name}」を計算できません (${error.message})〕`;
   }
 }
