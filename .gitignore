@@ -1,5 +1,8 @@
 dist/
 
+# 保管庫から npm run sync が写す公開記事と画像 (生成物。記事のコミットは保管庫でする)
+/content/
+
 src/data/generated/
 /.generated/
 /.claude

@@ -1,9 +1,15 @@
 name: Deploy GitHub Pages
 
+# 記事の正本は保管庫 (非公開リポジトリ asteain-ninia/derle-vault)。このリポジトリはコードだけを持ち、
+# ビルドのたびに保管庫を取得して、公開: true の記事と画像だけを content/ に写してから組み立てる。
 on:
   push:
     branches:
       - main
+  # 保管庫に push があったとき、保管庫側のワークフローから呼ぶ (未設定の間は手動で実行する)
+  repository_dispatch:
+    types:
+      - vault-updated
   workflow_dispatch:
 
 permissions:
@@ -19,10 +25,25 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    # 保管庫をこのリポジトリの中に置くと sync が止めるので、2 つを並べて取得する
+    defaults:
+      run:
+        working-directory: site
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          path: site
+
+      - name: Checkout vault
+        uses: actions/checkout@v4
+        with:
+          repository: asteain-ninia/derle-vault
+          # 保管庫の読み取り専用の deploy key (秘密鍵)
+          ssh-key: ${{ secrets.VAULT_DEPLOY_KEY }}
+          path: vault
+          # 更新履歴と古い版のページを保管庫の git log から作るので、履歴を全部取る
           fetch-depth: 0
 
       - name: Setup Node.js
@@ -37,16 +58,22 @@ jobs:
       - name: Run tests
         run: npm test
 
+      - name: Copy published articles from the vault
+        run: npm run sync
+        env:
+          DERLE_VAULT: ${{ github.workspace }}/vault
+
       - name: Build static site
         run: npm run build:site
         env:
+          DERLE_VAULT: ${{ github.workspace }}/vault
           # 静的ページの canonical・OGP・sitemap.xml に使う公開 URL (独自ドメインにしても追従する)
           SITE_URL: ${{ steps.pages.outputs.base_url }}
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./dist
+          path: ./site/dist
 
   deploy:
     needs: build

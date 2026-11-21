@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<title>記事が公開されるまでの仕組み</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap">
+<style>
+  /* Layout: one column of reading width; the two diagrams share node positions so only the edges differ. */
+  :root {
+    --bg: #f4f6f6;
+    --fg: #1d2a2e;
+    --muted: #5d6d72;
+    --line: #8a9ba0;
+    --panel: #ffffff;
+    --bought: #e2e8ea;
+    --made: #d3ebe6;
+    --accent: #1c7c74;
+    --truth: #b8801a;
+    --warn: #c0392b;
+    --font-display: "Zen Kaku Gothic New", "Noto Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif;
+    --font-body: "Noto Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #16201f; --fg: #e6ecea; --muted: #9fb0ad; --line: #5f7471; --panel: #1d2a29;
+      --bought: #2b3639; --made: #1f3f3b; --accent: #5fc4b8; --truth: #e0a93f; --warn: #ef6f5f;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #16201f; --fg: #e6ecea; --muted: #9fb0ad; --line: #5f7471; --panel: #1d2a29;
+    --bought: #2b3639; --made: #1f3f3b; --accent: #5fc4b8; --truth: #e0a93f; --warn: #ef6f5f;
+    color-scheme: dark;
+  }
+  body {
+    background: var(--bg); color: var(--fg);
+    font-family: var(--font-body); font-size: 15px; line-height: 1.75;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 32px 64px;
+  }
+  main { max-width: 1040px; margin: 0 auto; display: grid; gap: 36px; }
+  header { display: grid; gap: 6px; }
+  h1 { font-family: var(--font-display); font-weight: 700; font-size: 30px; line-height: 1.25; margin: 0; letter-spacing: .01em; text-wrap: balance; }
+  h2 { font-family: var(--font-display); font-weight: 700; font-size: 20px; margin: 0; text-wrap: balance; }
+  .lede { color: var(--muted); max-width: 44em; margin: 0; }
+  .eyebrow { font-size: 12px; letter-spacing: .12em; color: var(--muted); text-transform: uppercase; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 10px 20px; font-size: 13px; color: var(--muted); align-items: center; }
+  .legend span { display: inline-flex; align-items: center; gap: 7px; }
+  .sw { width: 22px; height: 14px; border-radius: 3px; border: 1.5px solid var(--line); flex: none; }
+  .sw.bought { background: var(--bought); }
+  .sw.made { background: var(--made); }
+  .sw.data { background: var(--panel); border-radius: 8px; }
+  .sw.truth { background: var(--panel); border: 2.5px solid var(--truth); border-radius: 8px; }
+  .ln { width: 26px; height: 0; border-top: 2px solid var(--line); flex: none; }
+  .ln.warn { border-top: 2px dashed var(--warn); }
+  .ln.new { border-top: 2.5px solid var(--accent); }
+
+  figure { margin: 0; display: grid; gap: 10px; }
+  .frame { background: var(--panel); border: 1px solid color-mix(in srgb, var(--line) 45%, transparent); border-radius: 6px; overflow-x: auto; padding: 8px; }
+  svg { display: block; min-width: 760px; width: 100%; height: auto; }
+  figcaption { color: var(--muted); font-size: 13.5px; max-width: 60em; }
+
+  /* SVG classes (page CSS applies to inline SVG) */
+  .node rect { stroke: var(--line); stroke-width: 1.2; }
+  .node.bought rect { fill: var(--bought); rx: 2; }
+  .node.made rect { fill: var(--made); rx: 2; }
+  .node.data rect { fill: var(--panel); rx: 10; }
+  .node.truth rect { stroke: var(--truth); stroke-width: 2.6; }
+  .node.weak rect { stroke-dasharray: 4 3; }
+  .node text { fill: var(--fg); font-family: var(--font-body); }
+  .node .t { font-size: 12.5px; font-weight: 700; }
+  .node .s { font-size: 10px; fill: var(--muted); }
+  .badge { font-size: 9px; font-weight: 700; fill: var(--truth); letter-spacing: .1em; }
+  .note { font-size: 10px; fill: var(--warn); font-family: var(--font-body); paint-order: stroke; stroke: var(--panel); stroke-width: 4px; stroke-linejoin: round; }
+  .note.ok { fill: var(--accent); }
+  .edge { fill: none; stroke: var(--line); stroke-width: 1.5; }
+  .edge.warn { stroke: var(--warn); stroke-dasharray: 5 4; }
+  .edge.new { stroke: var(--accent); stroke-width: 2.4; }
+  .edge.faint { stroke-dasharray: 2 4; }
+  .elbl { font-size: 10px; fill: var(--muted); font-family: var(--font-body); paint-order: stroke; stroke: var(--panel); stroke-width: 4px; stroke-linejoin: round; }
+  .elbl.warn { fill: var(--warn); }
+  .elbl.new { fill: var(--accent); font-weight: 700; }
+  .rowlbl { font-size: 10px; fill: var(--muted); letter-spacing: .1em; font-family: var(--font-body); }
+
+  .tablewrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; min-width: 640px; }
+  th, td { text-align: left; vertical-align: top; padding: 9px 10px; border-bottom: 1px solid color-mix(in srgb, var(--line) 40%, transparent); }
+  th { font-size: 12px; color: var(--muted); font-weight: 500; letter-spacing: .06em; }
+  td:first-child { font-weight: 700; white-space: nowrap; }
+  .pill { display: inline-block; font-size: 11px; padding: 1px 8px; border-radius: 999px; border: 1px solid; white-space: nowrap; }
+  .pill.ok { color: var(--accent); border-color: var(--accent); }
+  .pill.wait { color: var(--truth); border-color: var(--truth); }
+  .pill.todo { color: var(--warn); border-color: var(--warn); }
+  .truthword { color: var(--truth); font-weight: 700; }
+
+  section { display: grid; gap: 12px; }
+  ul { margin: 0; padding-left: 1.3em; display: grid; gap: 6px; }
+  li { max-width: 60em; }
+  li b { font-weight: 700; }
+  @media (max-width: 600px) { h1 { font-size: 24px; } body { font-size: 14px; } }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<main>
+  <header>
+    <div class="eyebrow">出界百科 / Derle-wikiLikePages · 2026-11-21 時点</div>
+    <h1>記事が公開されるまでの仕組み</h1>
+    <p class="lede">保管庫で書いた記事が、どこを通って出界百科に出るか。上の図が今の状態、下の図が「記事のコミットを保管庫だけにする」移行をした後の状態。ノードの位置は同じなので、変わるのは線と、正本の印が付く場所です。</p>
+    <div class="legend">
+      <span><i class="sw bought"></i>既製品</span>
+      <span><i class="sw made"></i>自作 (このリポジトリのスクリプト)</span>
+      <span><i class="sw data"></i>データ・ファイル</span>
+      <span><i class="sw truth"></i>正本</span>
+      <span><i class="ln"></i>いまある流れ</span>
+      <span><i class="ln warn"></i>手作業・問題のある線</span>
+      <span><i class="ln new"></i>移行後に新しく通す線</span>
+    </div>
+  </header>
+
+  <figure>
+    <h2>いま</h2>
+    <div class="frame"><svg id="now" viewBox="0 0 1000 385" role="img" aria-label="現状。Obsidian で保管庫に書き、npm run sync が公開: true の記事と画像だけを content/ に写す。content/ を wiki: を付けて手でコミットし、公開リポジトリの main に push すると GitHub Actions がテストとビルドをして GitHub Pages に出す。更新履歴と更新日は公開リポジトリの wiki: コミットから作られ、履歴の文言は GitHub のコミット画面へのリンクになる。保管庫にも別に git があるが、サイトには使われていない。"></svg></div>
+    <figcaption>本文の正本は保管庫だが、<b>記事の履歴の正本は公開リポジトリ</b>にある。保管庫にも git があるので、同じ編集を 2 か所でコミットすることになる。保管庫の git はサイトから見られておらず、6 月から 11 月までの公開記事の編集は公開リポジトリにだけコミットされていた (2026-11-21 に保管庫の履歴へ積み直した)。</figcaption>
+  </figure>
+
+  <figure>
+    <h2>移行後</h2>
+    <div class="frame"><svg id="next" viewBox="0 0 1000 385" role="img" aria-label="移行後。Obsidian で保管庫に書いてコミットし、GitHub の非公開リポジトリに push する。push が公開リポジトリの GitHub Actions を起こし、Actions が保管庫を取得して公開: true の記事と画像だけを選び、ビルドして GitHub Pages に出す。更新履歴と更新日は保管庫の git から作る。公開リポジトリはコードだけになる。古い版の見せ方は未決定。"></svg></div>
+    <figcaption>記事をコミットする場所は保管庫だけになり、履歴の正本もそこに一本化される。sync と content/ は無くなるのではなく <b>Actions の中に移る</b> (手元では <code>npm run dev</code> が同じことをする)。公開リポジトリは main にコードだけを持つ。</figcaption>
+  </figure>
+
+  <section>
+    <h2>機能ごとの変化</h2>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>機能</th><th>いま</th><th>移行後</th><th>状態</th></tr></thead>
+        <tbody>
+          <tr><td>公開の操作</td><td>書く → <code>npm run sync</code> → content/ を <code>wiki:</code> 付きでコミット → push</td><td>書く → 保管庫でコミット → push</td><td><span class="pill ok">減る</span> 文言を書くのは 1 回</td></tr>
+          <tr><td>公開の判定</td><td>frontmatter の <code>公開: true</code>。sync が手元で選び、差分を見てから push できる</td><td>判定は同じ。選ぶ場所が Actions の中になる</td><td><span class="pill wait">場所が変わる</span> 出る前に見るなら <code>npm run dev</code></td></tr>
+          <tr><td>更新履歴</td><td><code>wiki:</code> を付けたコミットだけ (5〜6 月の保管庫時代のものは接頭辞なしでも載る)</td><td>保管庫でその記事に触れた全コミット。公開前の執筆も載る</td><td><span class="pill ok">残る</span> <code>wiki:</code> は不要になる</td></tr>
+          <tr><td>作成日・更新日</td><td>最初のコミット / 履歴に載る最新のコミット</td><td>保管庫の最初のコミット / 最新のコミット</td><td><span class="pill wait">少し変わる</span> リンク整理のような一括コミットでも更新日が動く</td></tr>
+          <tr><td>古い版・差分</td><td>履歴の文言が GitHub のコミット画面へのリンク。誰でも見られる</td><td>リンク先が非公開リポジトリになり、自分以外は見られない</td><td><span class="pill todo">要決定</span> 下の「古い版をどうするか」</td></tr>
+          <tr><td>画像</td><td>公開記事が名前を書いている画像だけを写す</td><td>同じ</td><td><span class="pill ok">変わらない</span></td></tr>
+          <tr><td>手元の確認</td><td><code>npm run dev</code> が保管庫を監視し、保存のたびに作り直す</td><td>同じ。履歴も保管庫の git から出る</td><td><span class="pill ok">変わらない</span></td></tr>
+          <tr><td>ページの中身</td><td>SPA・記事ごとの静的ページ・固定リンク・カテゴリ・sitemap・保守レポート・織機の計算機</td><td>同じ</td><td><span class="pill ok">変わらない</span> 描画のコードには触れない</td></tr>
+          <tr><td>デプロイのきっかけ</td><td>公開リポジトリの main へ push</td><td>保管庫の push (Actions に知らせる) と、コードの push</td><td><span class="pill todo">設定が要る</span> 非公開リポジトリと鍵 2 つ</td></tr>
+          <tr><td>保管庫の控え</td><td>OneDrive だけ。git の履歴も OneDrive の中</td><td>GitHub にも履歴ごと残る</td><td><span class="pill ok">増える</span></td></tr>
+          <tr><td>上流の取り込み</td><td><code>upstream</code> から merge</td><td>同じ。content/ が git から外れるので衝突は減る</td><td><span class="pill ok">変わらない</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>古い版をどうするか</h2>
+    <ul>
+      <li><b>いまの「古い版」は GitHub の画面を借りている。</b> サイト自身は古い版を持っておらず、履歴の文言からコミットの差分画面へ飛ばしているだけ。保管庫を非公開にすると、この借り先が読者には見えなくなる。</li>
+      <li><b>案 1: サイトが自分で古い版を持つ。</b> ビルドのときに保管庫の git から各版の原稿を取り出し、記事と同じ見た目の静的ページ (<code>article/&lt;記事&gt;/版/…</code>) にする。Wikipedia の「この版を表示」に近く、GitHub に頼らない。新しく作る機能で、差分表示まで作るとその分大きい。見せるのは <code>公開: true</code> が付いた後の版だけにできる (公開前の版は、履歴の一覧に日付と文言だけ載せる)。</li>
+      <li><b>案 2: Actions が公開用の写しブランチを書く。</b> 保管庫のコミットを 1 件ずつ、公開記事だけに絞って公開リポジトリの別ブランチへ自動で写す。リンクは今と同じ GitHub の差分画面のまま。人がコミットする場所は増えないが、写しがもう 1 つできる。公開前の版は写しに入らないので、見えるのは公開後の差分だけ。</li>
+      <li><b>案 3: 履歴は日付と文言だけにする。</b> リンクを外す。作るものは無い。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>こちらに直接入れたコミットを保管庫に積む</h2>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>日付</th><th>いまの文言 (公開リポジトリ)</th><th>中身</th><th>保管庫での扱い</th></tr></thead>
+        <tbody>
+          <tr><td>2026-10-17</td><td>content: Obsidian 保管庫の未コミットだった変更を取り込み</td><td>記事 14 件。6 月から 10 月までの編集のまとめ</td><td>同じ日付で積む</td></tr>
+          <tr><td>2026-10-17</td><td>refactor: 保管庫を OneDrive の正本に戻し… (コードと一緒)</td><td>記事 26 件に <code>公開: true</code> を足した 1 行ずつ</td><td>記事の分だけ「chore: 公開する記事に 公開: true を付ける」で積む (履歴には載らない)</td></tr>
+          <tr><td>2026-11-01</td><td>content: 出星とデーレ語の外部リンクを [URL ラベル] 記法に直す</td><td>記事 2 件</td><td>同じ日付で積む</td></tr>
+          <tr><td>2026-11-05</td><td>wiki: 脱字の修正</td><td>記事 1 件</td><td>同じ日付で積む</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <ul>
+      <li><b>積める。</b> 公開記事 26 件のうち 25 件は、保管庫のいまの内容と公開リポジトリの内容が一致している。残る 1 件 (トルエ巫術都市国) は 11 月 14 日以降の編集がまだ公開されていないだけ。上の 4 件は、保管庫で未コミットになっている分を編集ごとに分けたものにあたる。</li>
+      <li><b>入れる位置は 6 月 5 日と 11 月 14 日の間。</b> 更新日は「いちばん新しいコミット」で決まるので、日付だけ昔にして末尾に足すと狂う。保管庫の履歴を並べ直すことになるため、先に <code>.git</code> を控えてから行う。保管庫のファイルそのものには触れない。</li>
+      <li><b>上 3 件はいまサイトの履歴に出ていない。</b> <code>content:</code> や <code>refactor:</code> で始まるコミットは履歴から外す決まりのため。保管庫に積むと、文言どおりに履歴へ載るようになる。</li>
+      <li><b>「公開: true を付ける」は履歴に載せない。</b> 26 記事すべてに触れるコミットなので、文言を <code>chore:</code> で始めて、いまある「コードのコミットは載せない」仕組みで外す。更新日も動かない。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>保管庫の中身</h2>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>もの</th><th>場所・数</th><th>中身</th><th>サイトとの関係</th></tr></thead>
+        <tbody>
+          <tr><td>記事</td><td>直下 153 件、<code>国/</code> 50 件</td><td>ほぼ全部に <code>種別</code> がある (国 55、地形 34、大圏 20、神 14、大陸 13 など 23 種)</td><td><code>公開: true</code> の 26 件だけが出る</td></tr>
+          <tr><td>未査読の記事</td><td>168 件</td><td>冒頭に未査読の印がある。公開中の 26 件には 1 件も無い</td><td>出ない。印を外して <code>公開: true</code> を付けると出る</td></tr>
+          <tr><td>メタの記事</td><td>11 件 (<code>種別: メタ</code>)</td><td>インフォボックス規約、国記事構成規約など。<code>公開: false</code> と書いてあるものが 5 件</td><td>出ない</td></tr>
+          <tr><td>画像</td><td><code>画像/</code> 20 件、76 MB。直下に壁紙の jpg が 1 件</td><td>圏地図、国別地図など</td><td>公開記事が名前を書いたものだけ出る</td></tr>
+          <tr><td>辞書・文法書</td><td>直下</td><td><code>出日辞書.json</code>、<code>出語文法書 4.0.1.docx</code></td><td>出ない</td></tr>
+          <tr><td>Obsidian の設定</td><td><code>.obsidian/</code> 22 件、<code>総合創作デーレ.base</code></td><td>グラフの色分けなど。OneDrive が作った競合コピー (<code>workspace-PC名-番号.json</code> など 14 件) は 2026-11-21 に消した</td><td>出ない</td></tr>
+          <tr><td>引き継ぎ</td><td><code>引き継ぎ/2026-11-04 パイプライン整理/</code> 16 件</td><td>11 月 4 日にノート PC の Claude がメイン PC 向けに書いた引き継ぎ。本文、Claude の記憶ファイルの写し 5 件、織機の表計算の控え (xlsx)、創作パイプラインの図、出星・シェル暦・出度量衡の下書き 4 件</td><td>出ない。git にも未登録</td></tr>
+          <tr><td>その他</td><td>直下</td><td><code>TODO.md</code> (空)、<code>debug.log</code></td><td>出ない</td></tr>
+          <tr><td>git</td><td>コミット 19 件</td><td>2026-11-21 の時点で未コミットは無い。リモートはまだ無く、履歴は OneDrive の中だけ</td><td>移行後はここが履歴の正本</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>移行の手順</h2>
+    <ul>
+      <li><b>1. 保管庫の履歴を整える (2026-11-21 に済み)。</b> <code>.git</code> を控え、上の 4 件を積んだ。<code>debug.log</code> と PC ごとに変わる <code>.obsidian/workspace*.json</code> は <code>.gitignore</code> で外し、残りの未コミット分 (未公開記事、<code>引き継ぎ/</code> など) をコミットした。履歴に載せたくないコミットは、文言を <code>chore:</code> で始める。</li>
+      <li><b>2. 保管庫を GitHub の非公開リポジトリに push する。</b> リポジトリを作るのは本人の作業。</li>
+      <li><b>3. 鍵を 2 つ置く。</b> Actions が保管庫を読むための読み取り専用の鍵と、保管庫の push を公開リポジトリの Actions に知らせるための鍵。これも本人の作業。</li>
+      <li><b>4. コードを変える。</b> 履歴を保管庫の git から作る、content/ を git から外す、Actions で保管庫を取得して sync する。</li>
+      <li><b>5. 古い版の見せ方を入れる。</b> 上の案のどれにするか決めてから。</li>
+    </ul>
+  </section>
+</main>
+
+<script>
+(function () {
+  const W = 160, H = 48;
+  const COL = { A: 15, B: 215, C: 415, D: 615, E: 815 };
+  const ROW = { 1: 40, 2: 130, 3: 220, 4: 310, 5: 400 };
+  const NS = "http://www.w3.org/2000/svg";
+
+  function el(tag, attrs, text) {
+    const n = document.createElementNS(NS, tag);
+    for (const k in attrs) n.setAttribute(k, attrs[k]);
+    if (text != null) n.textContent = text;
+    return n;
+  }
+  function anchor(nd, side, off) {
+    off = off || 0;
+    const x = COL[nd.col], y = ROW[nd.row];
+    if (side === "r") return [x + W, y + H / 2 + off];
+    if (side === "l") return [x, y + H / 2 + off];
+    if (side === "t") return [x + W / 2 + off, y];
+    return [x + W / 2 + off, y + H];
+  }
+  function route(a, sa, b, sb, via) {
+    const pts = [a];
+    if (via && via.length) { for (const p of via) pts.push(p); pts.push(b); return pts; }
+    const horizA = sa === "l" || sa === "r", horizB = sb === "l" || sb === "r";
+    if (horizA && horizB) {
+      if (Math.abs(a[1] - b[1]) < 1) { pts.push(b); return pts; }
+      const mx = (a[0] + b[0]) / 2;
+      pts.push([mx, a[1]], [mx, b[1]], b); return pts;
+    }
+    if (!horizA && !horizB) {
+      if (Math.abs(a[0] - b[0]) < 1) { pts.push(b); return pts; }
+      const my = (a[1] + b[1]) / 2;
+      pts.push([a[0], my], [b[0], my], b); return pts;
+    }
+    if (horizA) { pts.push([b[0], a[1]], b); return pts; }
+    pts.push([a[0], b[1]], b); return pts;
+  }
+  function draw(svgId, nodes, edges, rows) {
+    const svg = document.getElementById(svgId);
+    const defs = el("defs", {});
+    for (const [id, cls] of [["arr", "var(--line)"], ["arrw", "var(--warn)"], ["arrn", "var(--accent)"]]) {
+      const m = el("marker", { id: svgId + "-" + id, viewBox: "0 0 10 10", refX: "9", refY: "5", markerWidth: "7", markerHeight: "7", orient: "auto-start-reverse" });
+      m.appendChild(el("path", { d: "M0,0 L10,5 L0,10 z", fill: cls }));
+      defs.appendChild(m);
+    }
+    svg.appendChild(defs);
+    for (const r of rows) svg.appendChild(el("text", { x: 2, y: ROW[r.row] - 8, class: "rowlbl" }, r.label));
+    const gE = el("g", {}), gN = el("g", {});
+    svg.appendChild(gE); svg.appendChild(gN);
+    for (const e of edges) {
+      const A = nodes[e.from], B = nodes[e.to];
+      const pts = route(anchor(A, e.sa, e.oa), e.sa, anchor(B, e.sb, e.ob), e.sb, e.via);
+      const d = pts.map((p, i) => (i ? "L" : "M") + p[0] + "," + p[1]).join(" ");
+      const cls = "edge" + (e.kind ? " " + e.kind : "");
+      const mk = e.kind === "warn" ? "arrw" : e.kind === "new" ? "arrn" : "arr";
+      gE.appendChild(el("path", { d, class: cls, "marker-end": "url(#" + svgId + "-" + mk + ")" }));
+      if (e.label) {
+        let best = 0, bi = 0;
+        for (let i = 1; i < pts.length; i++) {
+          const len = Math.abs(pts[i][0] - pts[i - 1][0]) + Math.abs(pts[i][1] - pts[i - 1][1]);
+          if (len > best) { best = len; bi = i; }
+        }
+        if (e.seg != null) bi = e.seg;
+        const p = pts[bi - 1], q = pts[bi];
+        const vertical = Math.abs(p[0] - q[0]) < 1;
+        const lx = (p[0] + q[0]) / 2 + (e.dx || 0), ly = (p[1] + q[1]) / 2 + (e.dy || (vertical ? 0 : -5));
+        const t = el("text", { x: lx, y: ly, class: "elbl" + (e.kind === "warn" ? " warn" : e.kind === "new" ? " new" : ""), "text-anchor": vertical ? (e.ta || "start") : "middle", "dominant-baseline": vertical ? "middle" : "auto" }, e.label);
+        if (vertical && !e.ta) t.setAttribute("x", lx + 6);
+        gN.appendChild(t);
+      }
+    }
+    for (const id in nodes) {
+      const n = nodes[id], x = COL[n.col], y = ROW[n.row];
+      const g = el("g", { class: "node " + n.kind + (n.truth ? " truth" : "") + (n.weak ? " weak" : "") });
+      g.appendChild(el("rect", { x, y, width: W, height: H }));
+      g.appendChild(el("text", { x: x + 10, y: y + 20, class: "t" }, n.title));
+      g.appendChild(el("text", { x: x + 10, y: y + 36, class: "s" }, n.sub));
+      if (n.truth) g.appendChild(el("text", { x: x + W - 8, y: y - 5, class: "badge", "text-anchor": "end" }, "正本"));
+      if (n.note) g.appendChild(el("text", { x: x + 2, y: y + H + 13, class: "note" + (n.noteOk ? " ok" : "") }, n.note));
+      gN.appendChild(g);
+    }
+  }
+
+  const rows = [{ row: 1, label: "原稿から公開まで" }];
+
+  draw("now", {
+    obs:    { col: "A", row: 1, kind: "bought", title: "Obsidian", sub: "既製・ここで書く" },
+    vault:  { col: "B", row: 1, kind: "data", truth: true, title: "保管庫 (OneDrive)", sub: "全原稿と画像・本文の正本" },
+    dev:    { col: "A", row: 2, kind: "made", title: "npm run dev", sub: "保存のたびに作り直して表示" },
+    vgit:   { col: "B", row: 2, kind: "data", truth: true, weak: true, title: "保管庫の git", sub: "執筆の履歴・手元だけ", note: "サイトは見ない" },
+    sync:   { col: "C", row: 1, kind: "made", title: "npm run sync", sub: "公開: true の記事と画像を選ぶ" },
+    content:{ col: "D", row: 1, kind: "data", title: "content/", sub: "公開記事 26 件と画像の写し", note: "wiki: を付けて手でコミット" },
+    repo:   { col: "E", row: 1, kind: "data", truth: true, title: "公開リポジトリ main", sub: "コード＋content/・履歴の正本" },
+    actions:{ col: "E", row: 2, kind: "bought", title: "GitHub Actions", sub: "既製・テストとビルドを回す" },
+    hist:   { col: "D", row: 3, kind: "data", title: "更新履歴・更新日", sub: "wiki: のコミットから作る" },
+    build:  { col: "E", row: 3, kind: "made", title: "build:site", sub: "記事データと静的ページ" },
+    old:    { col: "D", row: 4, kind: "bought", title: "GitHub のコミット画面", sub: "差分と古い版・誰でも見られる" },
+    pages:  { col: "E", row: 4, kind: "bought", title: "GitHub Pages", sub: "既製・出界百科の公開先" },
+  }, [
+    { from: "obs", sa: "r", to: "vault", sb: "l", label: "書く" },
+    { from: "vault", sa: "l", oa: 14, to: "dev", sb: "r", via: [[195, 78], [195, 154]], label: "監視", seg: 2 },
+    { from: "vault", sa: "b", to: "vgit", sb: "t", kind: "warn", label: "コミット (別に)" },
+    { from: "vault", sa: "r", to: "sync", sb: "l", label: "読む" },
+    { from: "sync", sa: "r", to: "content", sb: "l", label: "写す" },
+    { from: "content", sa: "r", to: "repo", sb: "l", kind: "warn", label: "コミット → push", dy: -30 },
+    { from: "repo", sa: "b", to: "actions", sb: "t", label: "push で起動" },
+    { from: "actions", sa: "b", to: "build", sb: "t", label: "テストのあと" },
+    { from: "build", sa: "b", to: "pages", sb: "t", label: "デプロイ" },
+    { from: "repo", sa: "l", oa: 14, to: "hist", sb: "t", via: [[795, 78], [795, 200], [695, 200]], label: "git log", seg: 2, ta: "end", dx: -6 },
+    { from: "hist", sa: "r", to: "build", sb: "l", label: "" },
+    { from: "pages", sa: "l", to: "old", sb: "r", label: "履歴からリンク", dy: -30 },
+  ], rows);
+
+  draw("next", {
+    obs:    { col: "A", row: 1, kind: "bought", title: "Obsidian", sub: "既製・ここで書く" },
+    vault:  { col: "B", row: 1, kind: "data", truth: true, title: "保管庫 (OneDrive)", sub: "全原稿と画像・本文の正本" },
+    dev:    { col: "A", row: 2, kind: "made", title: "npm run dev", sub: "保存のたびに作り直して表示" },
+    vgit:   { col: "B", row: 2, kind: "data", truth: true, title: "保管庫の git", sub: "記事の履歴の正本" },
+    vrepo:  { col: "B", row: 3, kind: "data", title: "保管庫リポジトリ", sub: "GitHub・非公開・控えにもなる" },
+    sync:   { col: "C", row: 1, kind: "made", title: "sync (Actions の中)", sub: "公開: true の記事と画像を選ぶ" },
+    content:{ col: "D", row: 1, kind: "data", title: "content/ (生成物)", sub: "その場で作る・git に入れない" },
+    repo:   { col: "E", row: 1, kind: "data", title: "公開リポジトリ main", sub: "コードだけ" },
+    actions:{ col: "E", row: 2, kind: "bought", title: "GitHub Actions", sub: "既製・テストとビルドを回す" },
+    hist:   { col: "D", row: 3, kind: "data", title: "更新履歴・更新日", sub: "保管庫のコミットから作る" },
+    build:  { col: "E", row: 3, kind: "made", title: "build:site", sub: "記事データと静的ページ" },
+    old:    { col: "D", row: 4, kind: "bought", weak: true, title: "古い版・差分", sub: "保管庫は非公開で見せられない", note: "見せ方は要決定" },
+    pages:  { col: "E", row: 4, kind: "bought", title: "GitHub Pages", sub: "既製・出界百科の公開先" },
+  }, [
+    { from: "obs", sa: "r", to: "vault", sb: "l", label: "書く" },
+    { from: "vault", sa: "l", oa: 14, to: "dev", sb: "r", via: [[195, 78], [195, 154]], label: "監視", seg: 2 },
+    { from: "vault", sa: "b", to: "vgit", sb: "t", label: "コミット (ここだけ)" },
+    { from: "vgit", sa: "b", to: "vrepo", sb: "t", kind: "new", label: "push" },
+    { from: "vrepo", sa: "r", oa: -14, to: "sync", sb: "b", kind: "new", label: "Actions が取得", seg: 2 },
+    { from: "sync", sa: "r", to: "content", sb: "l", label: "選ぶ" },
+    { from: "content", sa: "b", oa: 50, to: "actions", sb: "l", ob: -12, kind: "new", label: "" },
+    { from: "vrepo", sa: "b", to: "actions", sb: "l", ob: 12, kind: "new", via: [[295, 290], [795, 290], [795, 166]], label: "push を知らせる", seg: 2 },
+    { from: "vrepo", sa: "r", to: "hist", sb: "l", kind: "new", label: "git log (全コミット)", dx: 60 },
+    { from: "hist", sa: "r", to: "build", sb: "l", label: "" },
+    { from: "repo", sa: "b", to: "actions", sb: "t", label: "コードの push" },
+    { from: "actions", sa: "b", to: "build", sb: "t", label: "テストのあと" },
+    { from: "build", sa: "b", to: "pages", sb: "t", label: "デプロイ" },
+    { from: "pages", sa: "l", to: "old", sb: "r", kind: "warn", label: "リンク先が無い", dy: -30 },
+  ], rows);
+})();
+</script>

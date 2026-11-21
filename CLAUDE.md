@@ -2,21 +2,22 @@
 
 架空世界の個人用 Wiki。[WikiLikePages](https://github.com/asteain-ninia/WikiLikePages) を一人で執筆・公開する前提でフォークしたもの (2026-10-17)。
 
-- 公開: GitHub Pages のまま。`main` へ直接 push → Actions でテスト・ビルド・デプロイ。PR・レビュー・投稿経路は持たない
+- 公開: GitHub Pages のまま。Actions がテスト・ビルド・デプロイする。きっかけは、このリポジトリの `main` への push (コードの変更) と、手動実行 (`gh workflow run deploy-pages.yml`。記事を出すときはいまはこれ)。PR・レビュー・投稿経路は持たない
 - remote: `origin` = asteain-ninia/Derle-wikiLikePages, `upstream` = asteain-ninia/WikiLikePages (上流の修正を取り込むときに使う)
 - `docs/spec.md` などの設計文書は上流のもので、多人数・投稿経路に関する記述はこのフォークでは適用しない
 
-## 正本は OneDrive の Obsidian 保管庫、content/ はそのミラー
+## 記事の正本は保管庫 (本文も履歴も)。このリポジトリはコードだけ
 
-- 正本: `C:/Users/…/OneDrive/ドキュメント/Obsidian` (2 台の PC で OneDrive 同期。未査読スタブ・辞書なども全部ここ)
-- `npm run sync` が保管庫から **frontmatter に `公開: true` がある原稿** と、それらが名前を書いている画像だけを `content/` にコピーする。`content/` は生成物で、保管庫に無いもの・公開をやめたものは消える。`content/` を直接編集しない
+- 正本: `C:/Users/…/OneDrive/ドキュメント/出界百科` (2026-11-21 に `Obsidian` から改名。2 台の PC で OneDrive 同期。未査読スタブ・辞書なども全部ここ)。git のリポジトリでもあり、`origin` は非公開の asteain-ninia/derle-vault。**記事をコミットする場所はここだけ**
+- `npm run sync` が保管庫から **frontmatter に `公開: true` がある原稿** と、それらが名前を書いている画像だけを `content/` にコピーする。`content/` は生成物で git に入れない (`.gitignore`)。保管庫に無いもの・公開をやめたものは消える。`content/` を直接編集しない・コミットしない
 - 保管庫の場所は PC ごとに `local.config.json` (`{ "vaultPath": "…" }`、git 管理外) か環境変数 `DERLE_VAULT` で指定
 - `npm run dev` は保管庫も監視し、保存のたびに同期 → ビルド → ブラウザ再読み込み
-- 公開の流れ: 保管庫の記事に `公開: true` を書く → `npm run sync` → `content/` の差分をコミット → push
-- 記事の更新履歴 = コミットの文言 (Wikipedia の編集要約と同じ扱い)。履歴に載るのは `wiki: 脱字の修正` のように `wiki:` を付けたコミットだけで、画面では接頭辞を外す。2026-10-17 より前の保管庫時代のコミットは接頭辞なしでも載る。コードの作業のコミットは載らない。記事の「更新」日も履歴に載るコミットの最新。`content/` を変えるコミットはコードの変更と分け、文言は短い編集要約にする (`src/lib/article-history.js`)
+- 公開の流れ: 保管庫の記事に `公開: true` を書く → 保管庫でコミット → push → Actions を実行。Actions は保管庫を読み取り専用の deploy key (このリポジトリの secret `VAULT_DEPLOY_KEY`) で取得し、その中で sync とビルドをする (`.github/workflows/deploy-pages.yml`)。保管庫の push で自動的に Actions を起こす仕組み (`repository_dispatch` の `vault-updated`) は受け口だけあり、保管庫側は未設定
+- 記事の更新履歴 = 保管庫のコミットの文言 (Wikipedia の編集要約と同じ扱い)。保管庫でその記事に触れたコミットは全部載る。載せたくないコミット (`公開: true` の付与、機械的な一括整理など) は文言を `chore:` で始める。記事の「作成」日は最初のコミット、「更新」日は履歴に載るコミットの最新 (`scripts/vault-git.mjs`、`src/lib/article-history.js`)
+- 履歴の文言は、その時点の版のページ `article/<記事 ID>/rev/<コミットの短い名前>/` へのリンク。`build:content` が保管庫の git から昔の原稿を読んで `.generated/article-revisions.json` (git 管理外、`src/` の外) に書き、`build:site` と開発サーバーが静的ページにする (`buildStaticRevisionPage`)。公開前の版も載せる。古い版のページは noindex で sitemap に入れず、昔の版にしか無い画像は出ない
 - frontmatter は単純な形 (空行 / `キー: 値` / `- 項目`) だけを解釈し、読めない形式は公開しない (fail-closed)。sync が名前を表示する
 - 未査読・メタなどの区別は保管庫側の運用で、このリポジトリのコードは知らない (オプトインの `公開: true` だけを見る)
-- 保管庫の旧 git 履歴 (2026-05-02〜) は、公開記事 26 件と画像だけを git filter-repo で抜き出して統合済み
+- 2026-10-17〜11-05 にこのリポジトリの `content/` へ直接入れた記事のコミット 4 件は、2026-11-21 に保管庫の履歴へ積み直した。このリポジトリの git 履歴に残る `content/` は移行前のもの
 
 ## 表示の決まり
 

@@ -2,13 +2,13 @@
 
 GitHub Pages で公開しつつ、Wikiライクな執筆体験は外部エディタへ委譲する個人用の Wiki 基盤です。
 
-[WikiLikePages](https://github.com/asteain-ninia/WikiLikePages) を一人で執筆・公開する前提でフォークしたもので、投稿経路やレビューの仕組みは持ちません。原稿の正本は手元の Obsidian 保管庫で、公開する記事だけを `npm run sync` で `content/` にコピーし、`main` へ直接 push すると GitHub Pages へ自動デプロイされます。
+[WikiLikePages](https://github.com/asteain-ninia/WikiLikePages) を一人で執筆・公開する前提でフォークしたもので、投稿経路やレビューの仕組みは持ちません。記事の正本は Obsidian の保管庫 (非公開の git リポジトリ) で、このリポジトリはコードだけを持ちます。GitHub Actions が保管庫を取得し、公開する記事だけを選んでビルドし、GitHub Pages へデプロイします。
 
 2026-03-17 に試作品を `archive/prototypes/` へ隔離し、ルート配下は正式実装の着手点へ切り替えました。
 
 ## 現在の構成
 
-- 公開する原稿と画像: `content/` (保管庫から `npm run sync` で生成。直接編集しない)
+- 公開する原稿と画像: `content/` (保管庫から `npm run sync` で生成。git に入れない。直接編集しない)
 - 画面本体: `index.html`
 - 実装コード: `src/`
 - 設計資料: `docs/`
@@ -17,9 +17,10 @@ GitHub Pages で公開しつつ、Wikiライクな執筆体験は外部エディ
 
 ## 保管庫との同期
 
-- リポジトリ直下に `local.config.json` (git 管理外) を作り、保管庫の場所を書きます: `{ "vaultPath": "C:/Users/…/Obsidian" }` (環境変数 `DERLE_VAULT` でも可)
+- リポジトリ直下に `local.config.json` (git 管理外) を作り、保管庫の場所を書きます: `{ "vaultPath": "C:/Users/…/出界百科" }` (環境変数 `DERLE_VAULT` でも可)
 - `npm run sync` で、frontmatter に `公開: true` がある原稿と、それらが名前を書いている画像だけを `content/` にコピーします。保管庫に無いもの・公開をやめたものは `content/` から消えます
-- `content/` の変更は `wiki: 脱字の修正` のように `wiki:` を付けてコミットします。この文言が記事の更新履歴 (編集要約) として、接頭辞を外して表示されます。`wiki:` の無いコミット (コードの作業など) は履歴にも更新日にも出ません
+- 記事のコミットは保管庫でします。保管庫でその記事に触れたコミットの文言が、記事の更新履歴 (編集要約) として表示され、文言からその時点の版のページを開けます。履歴に載せたくないコミットは文言を `chore:` で始めます
+- 公開するには、保管庫でコミットして push したあと、Actions の Deploy GitHub Pages を実行します (`gh workflow run deploy-pages.yml`)
 - frontmatter は単純な形 (`キー: 値` と `- 項目`) だけを解釈し、読めない形式の原稿は公開しません (名前を表示します)
 
 ## 実行メモ
