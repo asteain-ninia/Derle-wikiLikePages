@@ -1,0 +1,782 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<title>Derle-wikiLikePages 移行後</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap">
+<style>
+  /* Layout: one column of reading width; the two diagrams share node positions so only the edges differ. */
+  :root {
+    --bg: #f4f6f6;
+    --fg: #1d2a2e;
+    --muted: #5d6d72;
+    --line: #8a9ba0;
+    --panel: #ffffff;
+    --bought: #e2e8ea;
+    --made: #d3ebe6;
+    --accent: #1c7c74;
+    --truth: #b8801a;
+    --warn: #c0392b;
+    --font-display: "Zen Kaku Gothic New", "Noto Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif;
+    --font-body: "Noto Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #16201f; --fg: #e6ecea; --muted: #9fb0ad; --line: #5f7471; --panel: #1d2a29;
+      --bought: #2b3639; --made: #1f3f3b; --accent: #5fc4b8; --truth: #e0a93f; --warn: #ef6f5f;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #16201f; --fg: #e6ecea; --muted: #9fb0ad; --line: #5f7471; --panel: #1d2a29;
+    --bought: #2b3639; --made: #1f3f3b; --accent: #5fc4b8; --truth: #e0a93f; --warn: #ef6f5f;
+    color-scheme: dark;
+  }
+  body {
+    background: var(--bg); color: var(--fg);
+    font-family: var(--font-body); font-size: 15px; line-height: 1.75;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 32px 64px;
+  }
+  main { max-width: 1040px; margin: 0 auto; display: grid; gap: 36px; }
+  header { display: grid; gap: 6px; }
+  h1 { font-family: var(--font-display); font-weight: 700; font-size: 30px; line-height: 1.25; margin: 0; letter-spacing: .01em; text-wrap: balance; }
+  h2 { font-family: var(--font-display); font-weight: 700; font-size: 20px; margin: 0; text-wrap: balance; }
+  .lede { color: var(--muted); max-width: 44em; margin: 0; }
+  .eyebrow { font-size: 12px; letter-spacing: .12em; color: var(--muted); text-transform: uppercase; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 10px 20px; font-size: 13px; color: var(--muted); align-items: center; }
+  .legend span { display: inline-flex; align-items: center; gap: 7px; }
+  .sw { width: 22px; height: 14px; border-radius: 3px; border: 1.5px solid var(--line); flex: none; }
+  .sw.bought { background: var(--bought); }
+  .sw.made { background: var(--made); }
+  .sw.data { background: var(--panel); border-radius: 8px; }
+  .sw.truth { background: var(--panel); border: 2.5px solid var(--truth); border-radius: 8px; }
+  .ln { width: 26px; height: 0; border-top: 2px solid var(--line); flex: none; }
+  .ln.warn { border-top: 2px dashed var(--warn); }
+  .ln.new { border-top: 2.5px solid var(--accent); }
+
+  figure { margin: 0; display: grid; gap: 10px; }
+  .frame { background: var(--panel); border: 1px solid color-mix(in srgb, var(--line) 45%, transparent); border-radius: 6px; overflow-x: auto; padding: 8px; }
+  svg { display: block; min-width: 760px; width: 100%; height: auto; }
+  figcaption { color: var(--muted); font-size: 13.5px; max-width: 60em; }
+
+  /* SVG classes (page CSS applies to inline SVG) */
+  .node rect { stroke: var(--line); stroke-width: 1.2; }
+  .node.bought rect { fill: var(--bought); rx: 2; }
+  .node.made rect { fill: var(--made); rx: 2; }
+  .node.data rect { fill: var(--panel); rx: 10; }
+  .node.truth rect { stroke: var(--truth); stroke-width: 2.6; }
+  .node.weak rect { stroke-dasharray: 4 3; }
+  .node text { fill: var(--fg); font-family: var(--font-body); }
+  .node .t { font-size: 12.5px; font-weight: 700; }
+  .node .s { font-size: 10px; fill: var(--muted); }
+  .badge { font-size: 9px; font-weight: 700; fill: var(--truth); letter-spacing: .1em; }
+  .note { font-size: 10px; fill: var(--warn); font-family: var(--font-body); paint-order: stroke; stroke: var(--panel); stroke-width: 4px; stroke-linejoin: round; }
+  .note.ok { fill: var(--accent); }
+  .edge { fill: none; stroke: var(--line); stroke-width: 1.5; }
+  .edge.warn { stroke: var(--warn); stroke-dasharray: 5 4; }
+  .edge.new { stroke: var(--accent); stroke-width: 2.4; }
+  .edge.faint { stroke-dasharray: 2 4; }
+  .elbl { font-size: 10px; fill: var(--muted); font-family: var(--font-body); paint-order: stroke; stroke: var(--panel); stroke-width: 4px; stroke-linejoin: round; }
+  .elbl.warn { fill: var(--warn); }
+  .elbl.new { fill: var(--accent); font-weight: 700; }
+  .rowlbl { font-size: 10px; fill: var(--muted); letter-spacing: .1em; font-family: var(--font-body); }
+
+  .tablewrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; min-width: 640px; }
+  th, td { text-align: left; vertical-align: top; padding: 9px 10px; border-bottom: 1px solid color-mix(in srgb, var(--line) 40%, transparent); }
+  th { font-size: 12px; color: var(--muted); font-weight: 500; letter-spacing: .06em; }
+  td:first-child { font-weight: 700; white-space: nowrap; }
+  .pill { display: inline-block; font-size: 11px; padding: 1px 8px; border-radius: 999px; border: 1px solid; white-space: nowrap; }
+  .pill.ok { color: var(--accent); border-color: var(--accent); }
+  .pill.wait { color: var(--truth); border-color: var(--truth); }
+  .pill.todo { color: var(--warn); border-color: var(--warn); }
+  .truthword { color: var(--truth); font-weight: 700; }
+
+  section { display: grid; gap: 12px; }
+  ul { margin: 0; padding-left: 1.3em; display: grid; gap: 6px; }
+  li { max-width: 60em; }
+  li b { font-weight: 700; }
+  @media (max-width: 600px) { h1 { font-size: 24px; } body { font-size: 14px; } }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<main>
+  <header>
+    <div class="eyebrow">出界百科 / Derle-wikiLikePages · 2026-11-22 時点</div>
+    <h1>Derle-wikiLikePages 移行後</h1>
+    <p class="lede">記事のコミットを保管庫だけにする移行 (2026-11-21) が済んだ後の姿。上の図がいまの状態、下の図が次に目指す状態。ノードの位置は同じなので、変わるのは線だけです。移行の前後は <a href="pipeline.html">移行の記録</a> にあります。</p>
+    <div class="legend">
+      <span><i class="sw bought"></i>既製品</span>
+      <span><i class="sw made"></i>自作</span>
+      <span><i class="sw data"></i>データ・ファイル</span>
+      <span><i class="sw truth"></i>正本</span>
+      <span><i class="ln"></i>いまある流れ</span>
+      <span><i class="ln warn"></i>手作業・未接続</span>
+      <span><i class="ln new"></i>これから通す線</span>
+    </div>
+  </header>
+
+  <figure>
+    <h2>いま</h2>
+    <div class="frame"><svg id="now" viewBox="0 0 1000 385" role="img" aria-label="いまの状態。Obsidian で保管庫に書いてコミットし、GitHub の非公開リポジトリ derle-vault に push する。公開リポジトリの GitHub Actions を手で起こすと、Actions が保管庫を取得して公開: true の記事と画像だけを選び、織機のテンプレートを展開し、保管庫のコミットから更新履歴と古い版のページを作って GitHub Pages に出す。地図と気候の道具はサイトの記事データをまだ読んでいない。"></svg></div>
+    <figcaption>正本は保管庫ひとつ (本文も履歴も)。公開リポジトリはコードだけで、content/ は Actions の中でその場で作る。残っている手作業は、push のあとに Actions を起こすことと、地図の画像を作って保管庫に置くこと。織機はサイトに入ったが、テンプレートを書いた記事はまだ無い。</figcaption>
+  </figure>
+
+  <figure>
+    <h2>これから</h2>
+    <div class="frame"><svg id="next" viewBox="0 0 1000 385" role="img" aria-label="これからの状態。保管庫を push すると自動で公開リポジトリの GitHub Actions が動く。出星やシェル暦の記事が織機のテンプレートで数値を出す。地図と気候の道具がサイトの記事データを読み、国別地図や気候図を保管庫へ戻す。"></svg></div>
+    <figcaption>保管庫で「書く → コミット → push」をすれば、あとは全部自動で出る。数値は織機が計算し、地図と気候図は道具が記事データから作って保管庫に戻す。地図と気候の線は、2026-11-04 の「創作パイプライン」の図で目指した状態のうち、このサイトにつながる部分。</figcaption>
+  </figure>
+
+  <section>
+    <h2>これから変える線</h2>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>こと</th><th>いま</th><th>これから</th><th>状態</th></tr></thead>
+        <tbody>
+          <tr><td>デプロイのきっかけ</td><td>保管庫を push したあと、手で <code>gh workflow run deploy-pages.yml</code></td><td>保管庫の push で自動</td><td><span class="pill wait">トークン待ち</span> 仕組みは両側に入れてある。保管庫に secret <code>SITE_DISPATCH_TOKEN</code> を置けば動く</td></tr>
+          <tr><td>織機を記事で使う</td><td>テンプレートを書いた記事は 0 件</td><td>出星・シェル暦などの数値を <code>{{織機|…}}</code> で出し、<code>{{計算機|…}}</code> を置く</td><td><span class="pill todo">未着手</span> 下書きは保管庫の <code>引き継ぎ/2026-11-04 …/下書き/</code> にある</td></tr>
+          <tr><td>未査読の記事</td><td>保管庫 203 件のうち公開 26 件、未査読の印 168 件</td><td>査読して印を外し、<code>公開: true</code> を付ける</td><td><span class="pill wait">継続</span> 付けるコミットは <code>chore:</code> で始めると履歴に載らない</td></tr>
+          <tr><td>地図・気候図</td><td>国別地図は手作業 (3 枚)</td><td>visualizer と ExoClim-3 がサイトの記事データを読み、画像を保管庫へ戻す</td><td><span class="pill todo">未接続</span> 道具の側の作業</td></tr>
+          <tr><td>潜在的不具合 32 件</td><td><code>現状.md</code> に調査メモと TODO (2026-11-10)。未着手</td><td>再現するか確かめて直す</td><td><span class="pill todo">未着手</span> 裏は取れていない候補</td></tr>
+          <tr><td>古い版の差分</td><td>版ごとの全文を出す</td><td>前の版との差分も出す</td><td><span class="pill ok">必要になったら</span></td></tr>
+          <tr><td>Actions の部品</td><td>Node 20 の非推奨の警告が出る</td><td><code>actions/checkout</code> などを新しい版にする</td><td><span class="pill ok">小さい</span> 動作には影響していない</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>いまの公開の手順</h2>
+    <ul>
+      <li><b>1. 保管庫で書く。</b> 出したい記事には frontmatter に <code>公開: true</code> を書く。手元で確かめるなら、このリポジトリで <code>npm run dev</code>。</li>
+      <li><b>2. 保管庫でコミットして push する。</b> 文言がそのまま記事の更新履歴 (編集要約) になる。</li>
+      <li><b>3. Actions を起こす。</b> <code>gh workflow run deploy-pages.yml -R asteain-ninia/Derle-wikiLikePages</code>。自動デプロイを設定した後は要らない。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>決まり</h2>
+    <ul>
+      <li><b>記事をコミットする場所は保管庫だけ。</b> このリポジトリの content/ は生成物で、git に入れない。</li>
+      <li><b>履歴に載せたくないコミットは <code>chore:</code> で始める。</b> 接頭辞なしのコミットは、その記事の更新履歴に載り、その時点の版のページができる。</li>
+      <li><b>公開するのは <code>公開: true</code> がある記事と、それらが名前を書いている画像だけ。</b> frontmatter が読めない記事は出さない。</li>
+      <li><b>2 台の PC で同時に保管庫の git を使わない。</b> <code>.git</code> も OneDrive で同期されているため。</li>
+    </ul>
+  </section>
+</main>
+
+<script>
+(function () {
+  const W = 160, H = 48;
+  const COL = { A: 15, B: 215, C: 415, D: 615, E: 815 };
+  const ROW = { 1: 40, 2: 130, 3: 220, 4: 310, 5: 400 };
+  const NS = "http://www.w3.org/2000/svg";
+
+  function el(tag, attrs, text) {
+    const n = document.createElementNS(NS, tag);
+    for (const k in attrs) n.setAttribute(k, attrs[k]);
+    if (text != null) n.textContent = text;
+    return n;
+  }
+  function anchor(nd, side, off) {
+    off = off || 0;
+    const x = COL[nd.col], y = ROW[nd.row];
+    if (side === "r") return [x + W, y + H / 2 + off];
+    if (side === "l") return [x, y + H / 2 + off];
+    if (side === "t") return [x + W / 2 + off, y];
+    return [x + W / 2 + off, y + H];
+  }
+  function route(a, sa, b, sb, via) {
+    const pts = [a];
+    if (via && via.length) { for (const p of via) pts.push(p); pts.push(b); return pts; }
+    const horizA = sa === "l" || sa === "r", horizB = sb === "l" || sb === "r";
+    if (horizA && horizB) {
+      if (Math.abs(a[1] - b[1]) < 1) { pts.push(b); return pts; }
+      const mx = (a[0] + b[0]) / 2;
+      pts.push([mx, a[1]], [mx, b[1]], b); return pts;
+    }
+    if (!horizA && !horizB) {
+      if (Math.abs(a[0] - b[0]) < 1) { pts.push(b); return pts; }
+      const my = (a[1] + b[1]) / 2;
+      pts.push([a[0], my], [b[0], my], b); return pts;
+    }
+    if (horizA) { pts.push([b[0], a[1]], b); return pts; }
+    pts.push([a[0], b[1]], b); return pts;
+  }
+  function draw(svgId, nodes, edges, rows) {
+    const svg = document.getElementById(svgId);
+    const defs = el("defs", {});
+    for (const [id, cls] of [["arr", "var(--line)"], ["arrw", "var(--warn)"], ["arrn", "var(--accent)"]]) {
+      const m = el("marker", { id: svgId + "-" + id, viewBox: "0 0 10 10", refX: "9", refY: "5", markerWidth: "7", markerHeight: "7", orient: "auto-start-reverse" });
+      m.appendChild(el("path", { d: "M0,0 L10,5 L0,10 z", fill: cls }));
+      defs.appendChild(m);
+    }
+    svg.appendChild(defs);
+    for (const r of rows) svg.appendChild(el("text", { x: 2, y: ROW[r.row] - 8, class: "rowlbl" }, r.label));
+    const gE = el("g", {}), gN = el("g", {});
+    svg.appendChild(gE); svg.appendChild(gN);
+    for (const e of edges) {
+      const A = nodes[e.from], B = nodes[e.to];
+      const pts = route(anchor(A, e.sa, e.oa), e.sa, anchor(B, e.sb, e.ob), e.sb, e.via);
+      const d = pts.map((p, i) => (i ? "L" : "M") + p[0] + "," + p[1]).join(" ");
+      const cls = "edge" + (e.kind ? " " + e.kind : "");
+      const mk = e.kind === "warn" ? "arrw" : e.kind === "new" ? "arrn" : "arr";
+      gE.appendChild(el("path", { d, class: cls, "marker-end": "url(#" + svgId + "-" + mk + ")" }));
+      if (e.label) {
+        let best = 0, bi = 0;
+        for (let i = 1; i < pts.length; i++) {
+          const len = Math.abs(pts[i][0] - pts[i - 1][0]) + Math.abs(pts[i][1] - pts[i - 1][1]);
+          if (len > best) { best = len; bi = i; }
+        }
+        if (e.seg != null) bi = e.seg;
+        const p = pts[bi - 1], q = pts[bi];
+        const vertical = Math.abs(p[0] - q[0]) < 1;
+        const lx = (p[0] + q[0]) / 2 + (e.dx || 0), ly = (p[1] + q[1]) / 2 + (e.dy || (vertical ? 0 : -5));
+        const t = el("text", { x: lx, y: ly, class: "elbl" + (e.kind === "warn" ? " warn" : e.kind === "new" ? " new" : ""), "text-anchor": vertical ? (e.ta || "start") : "middle", "dominant-baseline": vertical ? "middle" : "auto" }, e.label);
+        if (vertical && !e.ta) t.setAttribute("x", lx + 6);
+        gN.appendChild(t);
+      }
+    }
+    for (const id in nodes) {
+      const n = nodes[id], x = COL[n.col], y = ROW[n.row];
+      const g = el("g", { class: "node " + n.kind + (n.truth ? " truth" : "") + (n.weak ? " weak" : "") });
+      g.appendChild(el("rect", { x, y, width: W, height: H }));
+      g.appendChild(el("text", { x: x + 10, y: y + 20, class: "t" }, n.title));
+      g.appendChild(el("text", { x: x + 10, y: y + 36, class: "s" }, n.sub));
+      if (n.truth) g.appendChild(el("text", { x: x + W - 8, y: y - 5, class: "badge", "text-anchor": "end" }, "正本"));
+      if (n.note) g.appendChild(el("text", { x: x + 2, y: y + H + 13, class: "note" + (n.noteOk ? " ok" : "") }, n.note));
+      gN.appendChild(g);
+    }
+  }
+
+  const rows = [{ row: 1, label: "原稿から公開まで" }];
+
+  draw("now", {
+  "obs": {
+    "col": "A",
+    "row": 1,
+    "kind": "bought",
+    "title": "Obsidian",
+    "sub": "既製・ここで書く"
+  },
+  "vault": {
+    "col": "B",
+    "row": 1,
+    "kind": "data",
+    "truth": true,
+    "title": "保管庫 (出界百科)",
+    "sub": "全原稿と画像・本文の正本"
+  },
+  "dev": {
+    "col": "A",
+    "row": 2,
+    "kind": "made",
+    "title": "npm run dev",
+    "sub": "保存のたびに作り直して表示"
+  },
+  "vgit": {
+    "col": "B",
+    "row": 2,
+    "kind": "data",
+    "truth": true,
+    "title": "保管庫の git",
+    "sub": "記事の履歴の正本"
+  },
+  "vrepo": {
+    "col": "B",
+    "row": 3,
+    "kind": "data",
+    "title": "derle-vault",
+    "sub": "GitHub・非公開・控えにもなる"
+  },
+  "sync": {
+    "col": "C",
+    "row": 1,
+    "kind": "made",
+    "title": "sync (Actions の中)",
+    "sub": "公開: true の記事と画像を選ぶ"
+  },
+  "content": {
+    "col": "D",
+    "row": 1,
+    "kind": "data",
+    "title": "content/ (生成物)",
+    "sub": "その場で作る・git に入れない"
+  },
+  "repo": {
+    "col": "E",
+    "row": 1,
+    "kind": "data",
+    "title": "公開リポジトリ main",
+    "sub": "コードだけ"
+  },
+  "loom": {
+    "col": "C",
+    "row": 2,
+    "kind": "made",
+    "weak": true,
+    "title": "出界の織機",
+    "sub": "自前の惑星計算機",
+    "note": "書いた記事はまだ 0 件"
+  },
+  "actions": {
+    "col": "E",
+    "row": 2,
+    "kind": "bought",
+    "title": "GitHub Actions",
+    "sub": "既製・テストとビルドを回す"
+  },
+  "hist": {
+    "col": "D",
+    "row": 3,
+    "kind": "data",
+    "title": "更新履歴・古い版",
+    "sub": "保管庫のコミットから作る"
+  },
+  "build": {
+    "col": "E",
+    "row": 3,
+    "kind": "made",
+    "title": "build:site",
+    "sub": "記事データと静的ページ"
+  },
+  "tools": {
+    "col": "D",
+    "row": 4,
+    "kind": "made",
+    "weak": true,
+    "title": "地図・気候の道具",
+    "sub": "visualizer・ExoClim-3",
+    "note": "記事データをまだ読んでいない"
+  },
+  "pages": {
+    "col": "E",
+    "row": 4,
+    "kind": "bought",
+    "title": "GitHub Pages",
+    "sub": "記事 26 件・古い版 139 件"
+  }
+}, [
+  {
+    "from": "obs",
+    "sa": "r",
+    "to": "vault",
+    "sb": "l",
+    "label": "書く"
+  },
+  {
+    "from": "vault",
+    "sa": "l",
+    "oa": 14,
+    "to": "dev",
+    "sb": "r",
+    "via": [
+      [
+        195,
+        78
+      ],
+      [
+        195,
+        154
+      ]
+    ],
+    "label": "監視",
+    "seg": 2
+  },
+  {
+    "from": "vault",
+    "sa": "b",
+    "to": "vgit",
+    "sb": "t",
+    "label": "コミット"
+  },
+  {
+    "from": "vgit",
+    "sa": "b",
+    "to": "vrepo",
+    "sb": "t",
+    "label": "push"
+  },
+  {
+    "from": "vrepo",
+    "sa": "r",
+    "oa": -14,
+    "to": "sync",
+    "sb": "l",
+    "via": [
+      [
+        395,
+        230
+      ],
+      [
+        395,
+        64
+      ]
+    ],
+    "label": "Actions が取得",
+    "seg": 2,
+    "dy": 66
+  },
+  {
+    "from": "sync",
+    "sa": "r",
+    "to": "content",
+    "sb": "l",
+    "label": "選ぶ"
+  },
+  {
+    "from": "content",
+    "sa": "b",
+    "oa": 50,
+    "to": "actions",
+    "sb": "l",
+    "ob": -12,
+    "label": ""
+  },
+  {
+    "from": "loom",
+    "sa": "r",
+    "to": "actions",
+    "sb": "l",
+    "kind": "",
+    "label": "テンプレートを展開",
+    "dx": -40
+  },
+  {
+    "from": "vrepo",
+    "sa": "b",
+    "oa": 20,
+    "to": "actions",
+    "sb": "l",
+    "ob": 12,
+    "kind": "warn",
+    "via": [
+      [
+        315,
+        290
+      ],
+      [
+        795,
+        290
+      ],
+      [
+        795,
+        166
+      ]
+    ],
+    "label": "手で起こす (gh workflow run)",
+    "seg": 2
+  },
+  {
+    "from": "vrepo",
+    "sa": "r",
+    "to": "hist",
+    "sb": "l",
+    "label": "git log",
+    "dx": 60
+  },
+  {
+    "from": "hist",
+    "sa": "r",
+    "to": "build",
+    "sb": "l",
+    "label": ""
+  },
+  {
+    "from": "repo",
+    "sa": "b",
+    "to": "actions",
+    "sb": "t",
+    "label": "コードの push"
+  },
+  {
+    "from": "actions",
+    "sa": "b",
+    "to": "build",
+    "sb": "t",
+    "label": "テストのあと"
+  },
+  {
+    "from": "build",
+    "sa": "b",
+    "to": "pages",
+    "sb": "t",
+    "label": "デプロイ"
+  }
+], rows);
+
+  draw("next", {
+  "obs": {
+    "col": "A",
+    "row": 1,
+    "kind": "bought",
+    "title": "Obsidian",
+    "sub": "既製・ここで書く"
+  },
+  "vault": {
+    "col": "B",
+    "row": 1,
+    "kind": "data",
+    "truth": true,
+    "title": "保管庫 (出界百科)",
+    "sub": "全原稿と画像・本文の正本"
+  },
+  "dev": {
+    "col": "A",
+    "row": 2,
+    "kind": "made",
+    "title": "npm run dev",
+    "sub": "保存のたびに作り直して表示"
+  },
+  "vgit": {
+    "col": "B",
+    "row": 2,
+    "kind": "data",
+    "truth": true,
+    "title": "保管庫の git",
+    "sub": "記事の履歴の正本"
+  },
+  "vrepo": {
+    "col": "B",
+    "row": 3,
+    "kind": "data",
+    "title": "derle-vault",
+    "sub": "GitHub・非公開・控えにもなる"
+  },
+  "sync": {
+    "col": "C",
+    "row": 1,
+    "kind": "made",
+    "title": "sync (Actions の中)",
+    "sub": "公開: true の記事と画像を選ぶ"
+  },
+  "content": {
+    "col": "D",
+    "row": 1,
+    "kind": "data",
+    "title": "content/ (生成物)",
+    "sub": "その場で作る・git に入れない"
+  },
+  "repo": {
+    "col": "E",
+    "row": 1,
+    "kind": "data",
+    "title": "公開リポジトリ main",
+    "sub": "コードだけ"
+  },
+  "loom": {
+    "col": "C",
+    "row": 2,
+    "kind": "made",
+    "title": "出界の織機",
+    "sub": "自前の惑星計算機",
+    "note": "出星・シェル暦の数値を計算値に",
+    "noteOk": true
+  },
+  "actions": {
+    "col": "E",
+    "row": 2,
+    "kind": "bought",
+    "title": "GitHub Actions",
+    "sub": "既製・テストとビルドを回す"
+  },
+  "hist": {
+    "col": "D",
+    "row": 3,
+    "kind": "data",
+    "title": "更新履歴・古い版",
+    "sub": "保管庫のコミットから作る"
+  },
+  "build": {
+    "col": "E",
+    "row": 3,
+    "kind": "made",
+    "title": "build:site",
+    "sub": "記事データと静的ページ"
+  },
+  "tools": {
+    "col": "D",
+    "row": 4,
+    "kind": "made",
+    "title": "地図・気候の道具",
+    "sub": "visualizer・ExoClim-3"
+  },
+  "pages": {
+    "col": "E",
+    "row": 4,
+    "kind": "bought",
+    "title": "GitHub Pages",
+    "sub": "記事 26 件・古い版 139 件"
+  }
+}, [
+  {
+    "from": "obs",
+    "sa": "r",
+    "to": "vault",
+    "sb": "l",
+    "label": "書く"
+  },
+  {
+    "from": "vault",
+    "sa": "l",
+    "oa": 14,
+    "to": "dev",
+    "sb": "r",
+    "via": [
+      [
+        195,
+        78
+      ],
+      [
+        195,
+        154
+      ]
+    ],
+    "label": "監視",
+    "seg": 2
+  },
+  {
+    "from": "vault",
+    "sa": "b",
+    "to": "vgit",
+    "sb": "t",
+    "label": "コミット"
+  },
+  {
+    "from": "vgit",
+    "sa": "b",
+    "to": "vrepo",
+    "sb": "t",
+    "label": "push"
+  },
+  {
+    "from": "vrepo",
+    "sa": "r",
+    "oa": -14,
+    "to": "sync",
+    "sb": "l",
+    "via": [
+      [
+        395,
+        230
+      ],
+      [
+        395,
+        64
+      ]
+    ],
+    "label": "Actions が取得",
+    "seg": 2,
+    "dy": 66
+  },
+  {
+    "from": "sync",
+    "sa": "r",
+    "to": "content",
+    "sb": "l",
+    "label": "選ぶ"
+  },
+  {
+    "from": "content",
+    "sa": "b",
+    "oa": 50,
+    "to": "actions",
+    "sb": "l",
+    "ob": -12,
+    "label": ""
+  },
+  {
+    "from": "loom",
+    "sa": "r",
+    "to": "actions",
+    "sb": "l",
+    "kind": "new",
+    "label": "数値と計算機を記事に出す",
+    "dx": -40
+  },
+  {
+    "from": "vrepo",
+    "sa": "b",
+    "oa": 20,
+    "to": "actions",
+    "sb": "l",
+    "ob": 12,
+    "kind": "new",
+    "via": [
+      [
+        315,
+        290
+      ],
+      [
+        795,
+        290
+      ],
+      [
+        795,
+        166
+      ]
+    ],
+    "label": "push で自動的に起こす",
+    "seg": 2
+  },
+  {
+    "from": "vrepo",
+    "sa": "r",
+    "to": "hist",
+    "sb": "l",
+    "label": "git log",
+    "dx": 60
+  },
+  {
+    "from": "hist",
+    "sa": "r",
+    "to": "build",
+    "sb": "l",
+    "label": ""
+  },
+  {
+    "from": "repo",
+    "sa": "b",
+    "to": "actions",
+    "sb": "t",
+    "label": "コードの push"
+  },
+  {
+    "from": "actions",
+    "sa": "b",
+    "to": "build",
+    "sb": "t",
+    "label": "テストのあと"
+  },
+  {
+    "from": "build",
+    "sa": "b",
+    "to": "pages",
+    "sb": "t",
+    "label": "デプロイ"
+  },
+  {
+    "from": "pages",
+    "sa": "l",
+    "to": "tools",
+    "sb": "r",
+    "kind": "new",
+    "label": "記事データを読む",
+    "dy": -30
+  },
+  {
+    "from": "tools",
+    "sa": "l",
+    "to": "vrepo",
+    "sb": "b",
+    "ob": -40,
+    "kind": "new",
+    "label": "国別地図・気候図を保管庫へ"
+  }
+], rows);
+})();
+</script>

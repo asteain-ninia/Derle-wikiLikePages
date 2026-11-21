@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ja">
 <meta charset="utf-8">
-<title>記事が公開されるまでの仕組み</title>
+<title>記事が公開されるまでの仕組み (移行の記録)</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap">
 <style>
@@ -105,9 +105,9 @@
 
 <main>
   <header>
-    <div class="eyebrow">出界百科 / Derle-wikiLikePages · 2026-11-21 時点</div>
+    <div class="eyebrow">出界百科 / Derle-wikiLikePages · 移行の記録 (2026-11-21 に実施)</div>
     <h1>記事が公開されるまでの仕組み</h1>
-    <p class="lede">保管庫で書いた記事が、どこを通って出界百科に出るか。上の図が今の状態、下の図が「記事のコミットを保管庫だけにする」移行をした後の状態。ノードの位置は同じなので、変わるのは線と、正本の印が付く場所です。</p>
+    <p class="lede">保管庫で書いた記事が、どこを通って出界百科に出るか。2026-11-21 に「記事のコミットを保管庫だけにする」移行をした。上の図が移行前、下の図が移行後。ノードの位置は同じなので、変わるのは線と、正本の印が付く場所です。移行後の現状と次に変える線は <a href="pipeline-next.html">Derle-wikiLikePages 移行後</a> にあります。</p>
     <div class="legend">
       <span><i class="sw bought"></i>既製品</span>
       <span><i class="sw made"></i>自作 (このリポジトリのスクリプト)</span>
@@ -115,37 +115,37 @@
       <span><i class="sw truth"></i>正本</span>
       <span><i class="ln"></i>いまある流れ</span>
       <span><i class="ln warn"></i>手作業・問題のある線</span>
-      <span><i class="ln new"></i>移行後に新しく通す線</span>
+      <span><i class="ln new"></i>移行で新しく通した線</span>
     </div>
   </header>
 
   <figure>
-    <h2>いま</h2>
+    <h2>移行前</h2>
     <div class="frame"><svg id="now" viewBox="0 0 1000 385" role="img" aria-label="現状。Obsidian で保管庫に書き、npm run sync が公開: true の記事と画像だけを content/ に写す。content/ を wiki: を付けて手でコミットし、公開リポジトリの main に push すると GitHub Actions がテストとビルドをして GitHub Pages に出す。更新履歴と更新日は公開リポジトリの wiki: コミットから作られ、履歴の文言は GitHub のコミット画面へのリンクになる。保管庫にも別に git があるが、サイトには使われていない。"></svg></div>
     <figcaption>本文の正本は保管庫だが、<b>記事の履歴の正本は公開リポジトリ</b>にある。保管庫にも git があるので、同じ編集を 2 か所でコミットすることになる。保管庫の git はサイトから見られておらず、6 月から 11 月までの公開記事の編集は公開リポジトリにだけコミットされていた (2026-11-21 に保管庫の履歴へ積み直した)。</figcaption>
   </figure>
 
   <figure>
-    <h2>移行後</h2>
-    <div class="frame"><svg id="next" viewBox="0 0 1000 385" role="img" aria-label="移行後。Obsidian で保管庫に書いてコミットし、GitHub の非公開リポジトリに push する。push が公開リポジトリの GitHub Actions を起こし、Actions が保管庫を取得して公開: true の記事と画像だけを選び、ビルドして GitHub Pages に出す。更新履歴と更新日は保管庫の git から作る。公開リポジトリはコードだけになる。古い版の見せ方は未決定。"></svg></div>
-    <figcaption>記事をコミットする場所は保管庫だけになり、履歴の正本もそこに一本化される。sync と content/ は無くなるのではなく <b>Actions の中に移る</b> (手元では <code>npm run dev</code> が同じことをする)。公開リポジトリは main にコードだけを持つ。</figcaption>
+    <h2>移行後 (2026-11-21 から)</h2>
+    <div class="frame"><svg id="next" viewBox="0 0 1000 385" role="img" aria-label="移行後。Obsidian で保管庫に書いてコミットし、GitHub の非公開リポジトリに push する。push が公開リポジトリの GitHub Actions を起こし、Actions が保管庫を取得して公開: true の記事と画像だけを選び、ビルドして GitHub Pages に出す。更新履歴と更新日は保管庫の git から作る。公開リポジトリはコードだけになる。古い版はサイト内のページとして作り、履歴からリンクする。"></svg></div>
+    <figcaption>記事をコミットする場所は保管庫だけになり、履歴の正本もそこに一本化される。sync と content/ は無くなるのではなく <b>Actions の中に移る</b> (手元では <code>npm run dev</code> が同じことをする)。公開リポジトリは main にコードだけを持つ。古い版は、ビルドのときにサイト内のページとして作るようにした。</figcaption>
   </figure>
 
   <section>
     <h2>機能ごとの変化</h2>
     <div class="tablewrap">
       <table>
-        <thead><tr><th>機能</th><th>いま</th><th>移行後</th><th>状態</th></tr></thead>
+        <thead><tr><th>機能</th><th>移行前</th><th>移行後</th><th>結果</th></tr></thead>
         <tbody>
           <tr><td>公開の操作</td><td>書く → <code>npm run sync</code> → content/ を <code>wiki:</code> 付きでコミット → push</td><td>書く → 保管庫でコミット → push</td><td><span class="pill ok">減る</span> 文言を書くのは 1 回</td></tr>
           <tr><td>公開の判定</td><td>frontmatter の <code>公開: true</code>。sync が手元で選び、差分を見てから push できる</td><td>判定は同じ。選ぶ場所が Actions の中になる</td><td><span class="pill wait">場所が変わる</span> 出る前に見るなら <code>npm run dev</code></td></tr>
-          <tr><td>更新履歴</td><td><code>wiki:</code> を付けたコミットだけ (5〜6 月の保管庫時代のものは接頭辞なしでも載る)</td><td>保管庫でその記事に触れた全コミット。公開前の執筆も載る</td><td><span class="pill ok">残る</span> <code>wiki:</code> は不要になる</td></tr>
+          <tr><td>更新履歴</td><td><code>wiki:</code> を付けたコミットだけ (5〜6 月の保管庫時代のものは接頭辞なしでも載る)</td><td>保管庫でその記事に触れた全コミット。公開前の執筆も載る</td><td><span class="pill ok">残った</span> 載せないコミットは <code>chore:</code> で始める</td></tr>
           <tr><td>作成日・更新日</td><td>最初のコミット / 履歴に載る最新のコミット</td><td>保管庫の最初のコミット / 最新のコミット</td><td><span class="pill wait">少し変わる</span> リンク整理のような一括コミットでも更新日が動く</td></tr>
-          <tr><td>古い版・差分</td><td>履歴の文言が GitHub のコミット画面へのリンク。誰でも見られる</td><td>リンク先が非公開リポジトリになり、自分以外は見られない</td><td><span class="pill todo">要決定</span> 下の「古い版をどうするか」</td></tr>
+          <tr><td>古い版・差分</td><td>履歴の文言が GitHub のコミット画面へのリンク。誰でも見られる</td><td>サイト内に版ごとのページ (<code>article/&lt;記事&gt;/rev/&lt;版&gt;/</code>) を作る。履歴の文言がそこへのリンク。公開前の版も読める</td><td><span class="pill ok">作った</span> 139 件。検索には載せない</td></tr>
           <tr><td>画像</td><td>公開記事が名前を書いている画像だけを写す</td><td>同じ</td><td><span class="pill ok">変わらない</span></td></tr>
           <tr><td>手元の確認</td><td><code>npm run dev</code> が保管庫を監視し、保存のたびに作り直す</td><td>同じ。履歴も保管庫の git から出る</td><td><span class="pill ok">変わらない</span></td></tr>
           <tr><td>ページの中身</td><td>SPA・記事ごとの静的ページ・固定リンク・カテゴリ・sitemap・保守レポート・織機の計算機</td><td>同じ</td><td><span class="pill ok">変わらない</span> 描画のコードには触れない</td></tr>
-          <tr><td>デプロイのきっかけ</td><td>公開リポジトリの main へ push</td><td>保管庫の push (Actions に知らせる) と、コードの push</td><td><span class="pill todo">設定が要る</span> 非公開リポジトリと鍵 2 つ</td></tr>
+          <tr><td>デプロイのきっかけ</td><td>公開リポジトリの main へ push</td><td>コードの push と手動実行。保管庫の push で起こす仕組みは、トークンを置けば動く</td><td><span class="pill wait">半分</span> 読み取りの鍵は設定済み</td></tr>
           <tr><td>保管庫の控え</td><td>OneDrive だけ。git の履歴も OneDrive の中</td><td>GitHub にも履歴ごと残る</td><td><span class="pill ok">増える</span></td></tr>
           <tr><td>上流の取り込み</td><td><code>upstream</code> から merge</td><td>同じ。content/ が git から外れるので衝突は減る</td><td><span class="pill ok">変わらない</span></td></tr>
         </tbody>
@@ -154,12 +154,12 @@
   </section>
 
   <section>
-    <h2>古い版をどうするか</h2>
+    <h2>古い版の扱い (決めたこと)</h2>
     <ul>
-      <li><b>いまの「古い版」は GitHub の画面を借りている。</b> サイト自身は古い版を持っておらず、履歴の文言からコミットの差分画面へ飛ばしているだけ。保管庫を非公開にすると、この借り先が読者には見えなくなる。</li>
-      <li><b>案 1: サイトが自分で古い版を持つ。</b> ビルドのときに保管庫の git から各版の原稿を取り出し、記事と同じ見た目の静的ページ (<code>article/&lt;記事&gt;/版/…</code>) にする。Wikipedia の「この版を表示」に近く、GitHub に頼らない。新しく作る機能で、差分表示まで作るとその分大きい。見せるのは <code>公開: true</code> が付いた後の版だけにできる (公開前の版は、履歴の一覧に日付と文言だけ載せる)。</li>
-      <li><b>案 2: Actions が公開用の写しブランチを書く。</b> 保管庫のコミットを 1 件ずつ、公開記事だけに絞って公開リポジトリの別ブランチへ自動で写す。リンクは今と同じ GitHub の差分画面のまま。人がコミットする場所は増えないが、写しがもう 1 つできる。公開前の版は写しに入らないので、見えるのは公開後の差分だけ。</li>
-      <li><b>案 3: 履歴は日付と文言だけにする。</b> リンクを外す。作るものは無い。</li>
+      <li><b>サイトが自分で古い版を持つ。</b> 移行前の「古い版」は GitHub のコミット画面を借りていた。保管庫を非公開にするとそこが読者に見えなくなるので、ビルドのときに保管庫の git から各版の原稿を取り出し、記事と同じ見た目の静的ページにした。</li>
+      <li><b>公開前の版も読める。</b> 未公開にしていたのは、固まっていない内容が正式な記事として出るのを避けるためで、隠したい内容ではないため。</li>
+      <li><b>古い版は検索に載せない。</b> ページの上部に「○年○月○日時点の古い版です」と最新の版へのリンクを出し、<code>noindex</code> を付け、sitemap に入れない。</li>
+      <li><b>昔の版にしか無い画像は出ない。</b> 配信するのは、いま公開している記事が使っている画像だけ。</li>
     </ul>
   </section>
 
@@ -198,20 +198,20 @@
           <tr><td>Obsidian の設定</td><td><code>.obsidian/</code> 22 件、<code>総合創作デーレ.base</code></td><td>グラフの色分けなど。OneDrive が作った競合コピー (<code>workspace-PC名-番号.json</code> など 14 件) は 2026-11-21 に消した</td><td>出ない</td></tr>
           <tr><td>引き継ぎ</td><td><code>引き継ぎ/2026-11-04 パイプライン整理/</code> 16 件</td><td>11 月 4 日にノート PC の Claude がメイン PC 向けに書いた引き継ぎ。本文、Claude の記憶ファイルの写し 5 件、織機の表計算の控え (xlsx)、創作パイプラインの図、出星・シェル暦・出度量衡の下書き 4 件</td><td>出ない。git にも未登録</td></tr>
           <tr><td>その他</td><td>直下</td><td><code>TODO.md</code> (空)、<code>debug.log</code></td><td>出ない</td></tr>
-          <tr><td>git</td><td>コミット 19 件</td><td>2026-11-21 の時点で未コミットは無い。リモートはまだ無く、履歴は OneDrive の中だけ</td><td>移行後はここが履歴の正本</td></tr>
+          <tr><td>git</td><td>コミット 20 件あまり</td><td>リモートは GitHub の非公開リポジトリ <code>derle-vault</code></td><td>ここが履歴の正本</td></tr>
         </tbody>
       </table>
     </div>
   </section>
 
   <section>
-    <h2>移行の手順</h2>
+    <h2>移行でやったこと</h2>
     <ul>
-      <li><b>1. 保管庫の履歴を整える (2026-11-21 に済み)。</b> <code>.git</code> を控え、上の 4 件を積んだ。<code>debug.log</code> と PC ごとに変わる <code>.obsidian/workspace*.json</code> は <code>.gitignore</code> で外し、残りの未コミット分 (未公開記事、<code>引き継ぎ/</code> など) をコミットした。履歴に載せたくないコミットは、文言を <code>chore:</code> で始める。</li>
-      <li><b>2. 保管庫を GitHub の非公開リポジトリに push する。</b> リポジトリを作るのは本人の作業。</li>
-      <li><b>3. 鍵を 2 つ置く。</b> Actions が保管庫を読むための読み取り専用の鍵と、保管庫の push を公開リポジトリの Actions に知らせるための鍵。これも本人の作業。</li>
-      <li><b>4. コードを変える。</b> 履歴を保管庫の git から作る、content/ を git から外す、Actions で保管庫を取得して sync する。</li>
-      <li><b>5. 古い版の見せ方を入れる。</b> 上の案のどれにするか決めてから。</li>
+      <li><b>1. 保管庫の履歴を整えた。</b> 並べ直す前の履歴を控え、上の 4 件を積んだ。<code>debug.log</code> と PC ごとに変わる <code>.obsidian/workspace*.json</code> は <code>.gitignore</code> で外し、残りの未コミット分 (未公開記事、<code>引き継ぎ/</code> など) をコミットした。</li>
+      <li><b>2. 保管庫のフォルダ名を「出界百科」にし、GitHub の非公開リポジトリ <code>derle-vault</code> に push した。</b> メイン PC も同じ状態に合わせた。</li>
+      <li><b>3. 鍵を置いた。</b> Actions が保管庫を読むための読み取り専用の deploy key (公開リポジトリの secret <code>VAULT_DEPLOY_KEY</code>)。保管庫の push を知らせるトークン (保管庫の secret <code>SITE_DISPATCH_TOKEN</code>) は別途。</li>
+      <li><b>4. コードを変えた。</b> 履歴を保管庫の git から作る、古い版のページを作る、content/ を git から外す、Actions で保管庫を取得して sync する。</li>
+      <li><b>5. 織機 (自前の惑星計算機) のブランチを main に入れた。</b></li>
     </ul>
   </section>
 </main>
@@ -342,7 +342,7 @@
     actions:{ col: "E", row: 2, kind: "bought", title: "GitHub Actions", sub: "既製・テストとビルドを回す" },
     hist:   { col: "D", row: 3, kind: "data", title: "更新履歴・更新日", sub: "保管庫のコミットから作る" },
     build:  { col: "E", row: 3, kind: "made", title: "build:site", sub: "記事データと静的ページ" },
-    old:    { col: "D", row: 4, kind: "bought", weak: true, title: "古い版・差分", sub: "保管庫は非公開で見せられない", note: "見せ方は要決定" },
+    old:    { col: "D", row: 4, kind: "made", title: "古い版のページ", sub: "サイト内・139 件・検索に載せない" },
     pages:  { col: "E", row: 4, kind: "bought", title: "GitHub Pages", sub: "既製・出界百科の公開先" },
   }, [
     { from: "obs", sa: "r", to: "vault", sb: "l", label: "書く" },
@@ -358,7 +358,7 @@
     { from: "repo", sa: "b", to: "actions", sb: "t", label: "コードの push" },
     { from: "actions", sa: "b", to: "build", sb: "t", label: "テストのあと" },
     { from: "build", sa: "b", to: "pages", sb: "t", label: "デプロイ" },
-    { from: "pages", sa: "l", to: "old", sb: "r", kind: "warn", label: "リンク先が無い", dy: -30 },
+    { from: "pages", sa: "l", to: "old", sb: "r", kind: "new", label: "履歴からリンク", dy: -30 },
   ], rows);
 })();
 </script>
