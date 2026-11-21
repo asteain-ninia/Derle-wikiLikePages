@@ -582,6 +582,26 @@ html[data-file-protocol="true"] .protocol-warning {
   border-bottom: none;
 }
 
+.history-list li.is-current .history-message {
+  font-weight: 700;
+}
+
+.revision-notice {
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  border: 1px solid #c8a94a;
+  border-left-width: 6px;
+  background: #fdf6e0;
+  color: #3a3000;
+  font-size: 0.92rem;
+  line-height: 1.7;
+}
+
+.revision-notice a {
+  margin-left: 0.4em;
+  font-weight: 700;
+}
+
 .history-date {
   color: var(--color-text-muted);
   white-space: nowrap;

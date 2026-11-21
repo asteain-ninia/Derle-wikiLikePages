@@ -319,3 +319,43 @@ test("SPA の入口にもメインページの canonical と OGP を足す", () 
   assert.match(site.homeHtml, /<script type="module" src="src\/main\.js"><\/script>/);
   assert.equal(site.homeHtml.replace(/\n  <link rel="canonical"[\s\S]*?(?=\n<\/head>)/, ""), indexHtml);
 });
+
+test("古い版のページは昔の本文と断り書きを出し、検索に載せず、sitemap にも入れない", () => {
+  const live = fixtureArticles.find((entry) => entry.id === "出界");
+  const liveWithHistory = {
+    ...live,
+    history: [
+      { date: "2026-03-15", message: "歴史を足す", revision: "bbb2222222" },
+      { date: "2026-03-10", message: "初版", revision: "aaa1111111" },
+    ],
+  };
+  const oldRecord = makeEntry("出界.md", "出界は昔の説明である。[[国/アクセル|アクセル]]と[[消えた記事]]がある。\n", {
+    updated: "2026-03-10",
+  });
+  const site = buildFixtureSite({
+    articles: fixtureArticles.map((entry) => (entry.id === "出界" ? liveWithHistory : entry)),
+    revisions: { 出界: [{ id: "aaa1111111", date: "2026-03-10", message: "初版", record: oldRecord }] },
+  });
+
+  const page = pageFor(site, "article/出界/rev/aaa1111111/index.html");
+  const body = detailViewHtml(page.html);
+  assert.match(body, /class="revision-notice"/);
+  assert.match(body, /2026\.03\.10 時点の古い版です/);
+  assert.match(body, /出界は昔の説明である/);
+  assert.doesNotMatch(body, /長い歴史がある/);
+  // 最新の版・ほかの記事へのリンクは、古い版の場所 (4 階層下) から辿れる
+  assert.ok(body.includes(`<a href="../../../../article/${encodeURIComponent("出界")}/">最新の版を見る</a>`));
+  assert.ok(body.includes(`href="../../../../article/${encodeURIComponent("国")}/${encodeURIComponent("アクセル")}/"`));
+  // 履歴ではいま表示している版だけリンクにしない
+  assert.match(body, /<li class="is-current">[\s\S]*?<span class="history-message">初版<\/span>/);
+  assert.ok(body.includes(`href="../../../../article/${encodeURIComponent("出界")}/rev/bbb2222222/"`));
+
+  assert.equal(metaContent(page.html, "name", "robots"), "noindex");
+  assert.ok(page.html.includes(`<link rel="canonical" href="${SITE_URL}article/${encodeURIComponent("出界")}/">`));
+  assert.doesNotMatch(site.sitemap, /rev\//);
+
+  // いまの記事のページには noindex を付けず、履歴から古い版へリンクする
+  const livePage = pageFor(site, "article/出界/index.html");
+  assert.equal(metaContent(livePage.html, "name", "robots"), null);
+  assert.ok(livePage.html.includes(`href="../../article/${encodeURIComponent("出界")}/rev/aaa1111111/"`));
+});

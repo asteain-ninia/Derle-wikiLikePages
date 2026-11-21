@@ -69,6 +69,9 @@ const imageByteSizes = Object.fromEntries(
   Object.keys(imageSizes).map((contentPath) => [contentPath, statSync(path.join(contentRoot, contentPath)).size])
 );
 const indexHtml = await readFile(path.join(projectRoot, "index.html"), "utf8");
+// 古い版の記事データ (build:content が保管庫の git から作る。無ければ古い版のページは作らない)
+const revisionsPath = path.join(projectRoot, ".generated", "article-revisions.json");
+const revisions = (await pathExists(revisionsPath)) ? JSON.parse(await readFile(revisionsPath, "utf8")) : {};
 const staticSite = buildStaticSite({
   articles: generatedArticles,
   indexHtml,
@@ -76,6 +79,7 @@ const staticSite = buildStaticSite({
   siteName: siteConfig.siteName,
   imageSizes,
   imageByteSizes,
+  revisions,
 });
 
 for (const page of staticSite.pages) {

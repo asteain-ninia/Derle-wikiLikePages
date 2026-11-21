@@ -1,6 +1,7 @@
 dist/
 
 src/data/generated/
+/.generated/
 /.claude
 
 # 保管庫の場所など、PC ごとの設定 (npm run sync が読む)

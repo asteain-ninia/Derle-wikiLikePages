@@ -10,8 +10,8 @@ import {
 import { loadTemplateHandlers } from "../src/lib/template-registry.js";
 import { buildBuildArtifacts } from "../src/lib/build-artifacts.js";
 import { readImageSize } from "../src/lib/image-size.js";
-import { summarizeArticleHistory } from "../src/lib/article-history.js";
-import { getVaultCommits, resolveVaultRepository } from "./vault-git.mjs";
+import { summarizeArticleHistory, toHistoryMessage, toRevisionId } from "../src/lib/article-history.js";
+import { getVaultCommits, readVaultFileAt, resolveVaultRepository } from "./vault-git.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -20,6 +20,9 @@ const contentRoot = path.join(projectRoot, "content");
 const templatesDir = path.join(projectRoot, "src", "lib", "templates");
 const generatedDataDir = path.join(projectRoot, "src", "data", "generated");
 const generatedDataPath = path.join(generatedDataDir, "content-data.js");
+// 古い版の記事データ。src/ は丸ごと配信されるので、その外に置く (読むのは build:site と開発サーバーだけ)
+const revisionsDir = path.join(projectRoot, ".generated");
+const revisionsPath = path.join(revisionsDir, "article-revisions.json");
 
 function toPosixPath(value) {
   return value.split(path.sep).join("/");
@@ -100,6 +103,8 @@ async function buildContentData() {
   const markdownFiles = allFiles.filter((filePath) => CONTENT_FILE_EXTENSIONS.test(filePath));
   const templateHandlers = await loadTemplateHandlers(templatesDir);
   const entries = [];
+  // 記事 ID → 古い版 ({ id, date, message, record }、新しい順)
+  const revisions = {};
   // content/ は npm run sync が公開する原稿だけを置く場所だが、手で置かれた原稿なども
   // 公開: true が無ければ載せない (念のための確認)
   const skippedPaths = [];
@@ -135,7 +140,7 @@ async function buildContentData() {
       continue;
     }
 
-    const { created, updated, history } = await getFileHistory(absolutePath, relativeToContent);
+    const { created, updated, history, commits } = await getFileHistory(absolutePath, relativeToContent);
 
     const record = buildArticleRecord({
       relativePath: relativeToContent,
@@ -148,6 +153,33 @@ async function buildContentData() {
     });
     record.history = history;
     entries.push(record);
+
+    // 履歴に載るコミットごとに、その時点の原稿から記事データを作る (古い版のページ用)。
+    // 昔の原稿が読めない・組み立てられないときは、その版だけ飛ばす (過去の履歴は直せないので、ビルドは止めない)
+    revisions[record.id] = commits
+      .filter((commit) => toHistoryMessage(commit) !== null)
+      .flatMap((commit) => {
+        const oldSource = readVaultFileAt(vaultRepository, commit.hash, commit.path || relativeToContent);
+        if (oldSource === null) {
+          console.log(`  古い版を読めないため飛ばします: ${relativeToContent} @ ${toRevisionId(commit.hash)}`);
+          return [];
+        }
+        try {
+          const oldRecord = buildArticleRecord({
+            relativePath: relativeToContent,
+            fileBasename,
+            sourceText: oldSource,
+            created,
+            updated: commit.date,
+            templateHandlers,
+            resolveAssetPath,
+          });
+          return [{ id: toRevisionId(commit.hash), date: commit.date, message: toHistoryMessage(commit), record: oldRecord }];
+        } catch (error) {
+          console.log(`  古い版を組み立てられないため飛ばします: ${relativeToContent} @ ${toRevisionId(commit.hash)} (${error.message})`);
+          return [];
+        }
+      });
   }
 
   const duplicates = findDuplicateEntryIds(entries);
@@ -171,6 +203,7 @@ async function buildContentData() {
     },
     generatedArticles: sortEntries(publishedEntries),
     imageSizes,
+    revisions: Object.fromEntries(publishedEntries.map((entry) => [entry.id, revisions[entry.id] ?? []])),
   };
 }
 
@@ -197,6 +230,8 @@ function serializeModule({ contentBuildInfo, generatedArticles, imageSizes }) {
 const contentData = await buildContentData();
 await mkdir(generatedDataDir, { recursive: true });
 await writeFile(generatedDataPath, serializeModule(contentData), "utf8");
+await mkdir(revisionsDir, { recursive: true });
+await writeFile(revisionsPath, JSON.stringify(contentData.revisions), "utf8");
 
 // リンク解決結果のビルド成果物 (backlinks.json など) と管理者向け保守レポートを同じ場所に書き出す。
 // src/ ごと dist/ にコピーされるので、公開サイトでも src/data/generated/*.json として読める
@@ -209,7 +244,8 @@ for (const [fileName, content] of Object.entries(artifactFiles)) {
 }
 
 console.log(
-  `Generated ${contentData.generatedArticles.length} article records at ${path.relative(projectRoot, generatedDataPath)}`
+  `Generated ${contentData.generatedArticles.length} article records at ${path.relative(projectRoot, generatedDataPath)}` +
+    ` (古い版 ${Object.values(contentData.revisions).reduce((sum, list) => sum + list.length, 0)} 件)`
 );
 const { summary } = maintenanceReport;
 console.log(

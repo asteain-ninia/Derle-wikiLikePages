@@ -12,10 +12,12 @@ import {
   buildSectionAnchorId,
   buildStaticArticleHref,
   buildStaticCategoryHref,
+  buildStaticRevisionHref,
   buildWikiGraph,
   matchSectionHeading,
   parseAppRoute,
 } from "./article-page-model.js";
+import { formatDisplayDate } from "./home-page-model.js";
 import { escapeHtml, renderArticlePage, renderCategoryPage, setImageSizes } from "./renderers.js";
 
 // og:image に使う画像の大きさの上限。X (旧 Twitter) のカードが 5MB まで、Facebook が 8MB まで
@@ -182,8 +184,10 @@ export function buildStaticSiteHeader(indexHtml, rootPrefix) {
   return rewriteInternalUrls(header, { rootPrefix, entryById: new Map() });
 }
 
-function renderMetaTags({ siteName, title, description, canonicalUrl, ogType, image, published, modified }) {
+function renderMetaTags({ siteName, title, description, canonicalUrl, ogType, image, published, modified, noindex }) {
   const tags = [
+    // 古い版のページは検索に載せない (canonical は最新の版を指す)
+    ...(noindex ? ['<meta name="robots" content="noindex">'] : []),
     `<meta name="description" content="${escapeHtml(description)}">`,
     `<link rel="canonical" href="${escapeHtml(canonicalUrl)}">`,
     `<meta property="og:site_name" content="${escapeHtml(siteName)}">`,
@@ -223,6 +227,7 @@ export function renderStaticDocument({
   image = null,
   published = "",
   modified = "",
+  noindex = false,
   rootPrefix,
   headerHtml,
   heading,
@@ -236,7 +241,7 @@ export function renderStaticDocument({
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${escapeHtml(documentTitle)}</title>
-${renderMetaTags({ siteName, title, description, canonicalUrl, ogType, image, published, modified })}
+${renderMetaTags({ siteName, title, description, canonicalUrl, ogType, image, published, modified, noindex })}
   <link rel="stylesheet" href="${escapeHtml(rootPrefix)}src/styles.css">
 </head>
 <body data-static-page="${escapeHtml(pageKind)}">
@@ -327,6 +332,57 @@ export function buildStaticArticlePage(graph, entryId, context) {
   });
 
   return { href, filePath: staticHrefToFilePath(href), url: canonicalUrl, lastmod: pageModel.updated, html };
+}
+
+// 記事の古い版のページ。revision は { id, date, message, record } で、record はその時点の原稿から作った記事データ。
+// 本文中のリンクはいまの記事の集まりに対して解決する (昔あって今は無い記事へのリンクは未作成の扱いになる)。
+// 画像はいま公開している記事が使っているものだけが配信されるので、昔の版にしか無い画像は表示されない。
+// 検索には載せず (noindex、sitemap にも入れない)、canonical は最新の版を指す
+export function buildStaticRevisionPage(articles, entry, revision, context) {
+  const { siteName, siteUrl, headerFor, staticCategoryNames } = context;
+  const record = {
+    ...revision.record,
+    id: entry.id,
+    history: entry.history ?? [],
+    revision: { id: revision.id, date: revision.date, message: revision.message },
+  };
+  const graph = buildWikiGraph(articles.map((candidate) => (candidate.id === entry.id ? record : candidate)));
+  const pageModel = buildArticlePageModel(graph, entry.id);
+  if (!pageModel) {
+    return null;
+  }
+
+  const href = buildStaticRevisionHref(entry.id, revision.id);
+  const rootPrefix = rootPrefixFor(href);
+  const displayDate = formatDisplayDate(revision.date);
+  const notice = `<div class="revision-notice" role="note">
+      <strong>これは ${escapeHtml(displayDate)} 時点の古い版です。</strong>
+      いまの記事とは内容が違うことがあります (この版の編集: ${escapeHtml(revision.message)})。
+      <a href="${escapeHtml(buildStaticArticleHref(entry.id))}">最新の版を見る</a>
+    </div>`;
+  const lead = `${displayDate} 時点の古い版です。`;
+
+  const html = renderStaticDocument({
+    siteName,
+    documentTitle: `${pageModel.title} (${displayDate} の版) - ${siteName}`,
+    title: `${pageModel.title} (${displayDate} の版)`,
+    description: summarizeForDescription(`${lead}${pageModel.summary || pageModel.preview || ""}`),
+    canonicalUrl: new URL(buildStaticArticleHref(entry.id), siteUrl).href,
+    ogType: "article",
+    noindex: true,
+    rootPrefix,
+    headerHtml: headerFor(rootPrefix),
+    heading: pageModel.title,
+    lead,
+    bodyHtml: rewriteInternalUrls(`${notice}${renderArticlePage(pageModel)}`, {
+      rootPrefix,
+      entryById: graph.entryById,
+      staticCategoryNames,
+    }),
+    pageKind: "revision",
+  });
+
+  return { href, filePath: staticHrefToFilePath(href), html };
 }
 
 export function buildStaticCategoryPage(categoryName, articles, context) {
@@ -421,7 +477,8 @@ export function injectHomePageMeta(indexHtml, { siteName, siteUrl }) {
   return indexHtml.replace("</head>", `${tags.map((tag) => `  ${tag}`).join("\n")}\n</head>`);
 }
 
-// 静的ページ一式。pages は dist/ からのファイルの場所と中身、sitemapEntries は sitemap.xml に載せる URL
+// 静的ページ一式。pages は dist/ からのファイルの場所と中身、sitemapEntries は sitemap.xml に載せる URL。
+// revisions は記事 ID → 古い版 ({ id, date, message, record }) の並びで、古い版のページは sitemap に載せない
 export function buildStaticSite({
   articles,
   indexHtml,
@@ -429,6 +486,7 @@ export function buildStaticSite({
   siteName,
   imageSizes = {},
   imageByteSizes = {},
+  revisions = {},
 }) {
   const normalizedSiteUrl = normalizeSiteUrl(siteUrl);
   setImageSizes(imageSizes);
@@ -460,9 +518,14 @@ export function buildStaticSite({
   const categoryPages = [...staticCategoryNames].map((name) =>
     buildStaticCategoryPage(name, articles, context)
   );
+  const revisionPages = articles.flatMap((entry) =>
+    (revisions[entry.id] ?? [])
+      .map((revision) => buildStaticRevisionPage(articles, entry, revision, context))
+      .filter(Boolean)
+  );
   const pages = [...articlePages, ...categoryPages];
 
-  const collisions = findStaticPathCollisions(pages.map((page) => page.filePath));
+  const collisions = findStaticPathCollisions([...pages, ...revisionPages].map((page) => page.filePath));
   if (collisions.length > 0) {
     throw new Error(
       `大文字小文字などだけが違う静的ページがあり、Windows などで同じファイルになります。原稿の名前を変えてください。\n${collisions
@@ -478,7 +541,7 @@ export function buildStaticSite({
 
   return {
     siteUrl: normalizedSiteUrl,
-    pages,
+    pages: [...pages, ...revisionPages],
     sitemap: buildSitemap(sitemapEntries),
     robots: buildRobotsTxt(normalizedSiteUrl),
     homeHtml: injectHomePageMeta(indexHtml, { siteName, siteUrl: normalizedSiteUrl }),

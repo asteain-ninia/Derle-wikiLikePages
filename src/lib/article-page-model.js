@@ -223,6 +223,11 @@ export function buildStaticArticleHref(entryId) {
   return buildStaticHref("article", entryId);
 }
 
+// 記事の古い版の静的ページ (article/<記事 ID>/rev/<コミットの短い名前>/)
+export function buildStaticRevisionHref(entryId, revision) {
+  return `${buildStaticArticleHref(entryId)}rev/${encodeURIComponent(revision)}/`;
+}
+
 export function buildStaticCategoryHref(categoryName) {
   return buildStaticHref("category", categoryName);
 }

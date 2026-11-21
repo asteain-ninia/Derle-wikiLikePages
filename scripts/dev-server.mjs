@@ -75,6 +75,7 @@ async function resolveFilePath(absolutePath) {
 // 記事データ (content-data.js) が作り直されるたびに読み直す。描画関数 (renderers.js など) を書き換えたときは
 // SPA は再読み込みで反映されるが、静的ページはこのサーバーを起動し直すまで古いまま
 const generatedDataPath = path.join(projectRoot, "src", "data", "generated", "content-data.js");
+const revisionsPath = path.join(projectRoot, ".generated", "article-revisions.json");
 let devStaticSite = { version: null, site: null };
 
 async function loadDevStaticSite(origin) {
@@ -90,6 +91,7 @@ async function loadDevStaticSite(origin) {
       siteUrl: `${origin}/`,
       siteName: siteConfig.siteName,
       imageSizes,
+      revisions: existsSync(revisionsPath) ? JSON.parse(await readFile(revisionsPath, "utf8")) : {},
     });
     devStaticSite = { version, site };
   }

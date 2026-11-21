@@ -4,6 +4,7 @@ import {
   buildDisambiguationHref,
   buildMissingPageHref,
   buildStaticArticleHref,
+  buildStaticRevisionHref,
 } from "./article-page-model.js";
 
 export function escapeHtml(value) {
@@ -752,7 +753,7 @@ export function renderCategoryPage(categoryName, articles) {
   `;
 }
 
-function renderHistory(history) {
+function renderHistory(history, entryId, currentRevision = "") {
   if (!history || history.length === 0) {
     return '<p class="empty-note">履歴情報はありません。</p>';
   }
@@ -761,11 +762,13 @@ function renderHistory(history) {
     <ul class="history-list">
       ${history
         .map((entry) => {
-          // 文言は GitHub のそのコミット (差分) へのリンクにする。URL が作れなかったときは文字だけ
-          const message = entry.url
-            ? `<a class="history-message" href="${escapeHtml(entry.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(entry.message)}</a>`
-            : `<span class="history-message">${escapeHtml(entry.message)}</span>`;
-          return `<li>
+          // 文言はその時点の版のページ (静的ページ) へのリンクにする。いま表示している版は文字だけ
+          const isCurrent = Boolean(currentRevision) && entry.revision === currentRevision;
+          const message =
+            entry.revision && entryId && !isCurrent
+              ? `<a class="history-message" href="${escapeHtml(buildStaticRevisionHref(entryId, entry.revision))}" title="この時点の版を表示">${escapeHtml(entry.message)}</a>`
+              : `<span class="history-message">${escapeHtml(entry.message)}</span>`;
+          return `<li${isCurrent ? ' class="is-current"' : ""}>
               <span class="history-date">${escapeHtml(formatDisplayDate(entry.date))}</span>
               ${message}
             </li>`;
@@ -852,7 +855,7 @@ export function renderArticlePage(pageModel) {
 
           <section class="article-sidebox">
             <h3>更新履歴</h3>
-            ${renderHistory(pageModel.history)}
+            ${renderHistory(pageModel.history, pageModel.id, pageModel.revision?.id)}
           </section>
 
           <section class="article-sidebox">
