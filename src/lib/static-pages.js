@@ -453,7 +453,14 @@ ${urls}
 `;
 }
 
+// 検索エンジンが読む robots.txt はドメインの直下だけ (RFC 9309)。GitHub Pages のプロジェクトページ
+// (…github.io/リポジトリ名/) の下に置いても読まれないので、そのときは作らず null を返す
+// (sitemap は Search Console に直接登録する)
 export function buildRobotsTxt(siteUrl) {
+  if (new URL(siteUrl).pathname !== "/") {
+    return null;
+  }
+
   return `User-agent: *
 Allow: /
 

@@ -62,3 +62,15 @@ export function selectPublishedFiles(notes, imagePaths) {
     unreadableNotes,
   };
 }
+
+// content/ の今のファイル一覧 (実際の名前) と、コピーする目標の一覧から、消すもの・残すものを決める。
+// 名前が完全に一致しないものは消す (keep に入れない)。Windows は大文字小文字を区別しないので、
+// 保管庫で Foo.md → foo.md と改名したときに旧名を残すと、書き込みが旧名のファイルに入り、
+// そのあと「目標に無い」旧名を消して記事ごと消える。消すのを書き込みより先にすれば、新しい名前で書き直される
+export function planMirror(existingFiles, targetFiles) {
+  const targets = new Set(targetFiles);
+  return {
+    remove: existingFiles.filter((filePath) => !targets.has(filePath)),
+    keep: new Set(existingFiles.filter((filePath) => targets.has(filePath))),
+  };
+}

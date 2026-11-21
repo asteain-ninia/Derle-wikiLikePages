@@ -1057,3 +1057,39 @@ test("buildArticleRecord は自己終了の <ref name=... /> を同じ脚注の�
       `先に参照${mark(3)}…ではなく${mark(4)}本文E${mark(4)}。本文の無い名前と空ので終わる。`
   );
 });
+
+test("buildArticleRecord は HTML の注釈を表・引用・テンプレートの値・脚注の中でも除き、<syntaxhighlight> の中は残す", () => {
+  const article = buildArticleRecord({
+    relativePath: "test.md",
+    fileBasename: "テスト",
+    created: "2026-03-20",
+    updated: "2026-03-23",
+    sourceText: [
+      "{{基礎情報 国",
+      "|首都=アクセル<!-- 仮 -->",
+      "}}",
+      "行A",
+      "<!-- A -> B は未定 -->",
+      "行B<!-- 行末の注釈 -->",
+      "",
+      "| 項目 | 値 |",
+      "| --- | --- |",
+      "| 人口 | 100<!-- 要確認 --> |",
+      "",
+      "> 引用<!-- 注 -->",
+      "",
+      "本文<ref>出典<!-- 注 --></ref>。",
+      "",
+      "<syntaxhighlight lang=\"html\">",
+      "<!-- コードの注釈 -->",
+      "</syntaxhighlight>",
+    ].join("\n"),
+  });
+
+  const paragraphs = article.sections[0].paragraphs;
+  assert.equal(paragraphs[0], "行A行B");
+  assert.deepEqual(article.footnotes, ["出典"]);
+  assert.deepEqual(paragraphs.at(-1), { type: "code-block", language: "html", body: "<!-- コードの注釈 -->" });
+  const withoutCode = JSON.stringify({ ...article, sections: [{ paragraphs: paragraphs.slice(0, -1) }] });
+  assert.doesNotMatch(withoutCode, /<!--|-->|未定|要確認|仮/);
+});

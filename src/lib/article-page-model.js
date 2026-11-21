@@ -326,6 +326,8 @@ export function buildReferenceIndex(entries) {
 
   for (const entry of entries) {
     addReference(entry.title, entry.id);
+    // Obsidian のパス付きリンク [[国/アクセル]] は記事 ID (保管庫からのパス) と一致する
+    addReference(entry.id, entry.id);
 
     for (const alias of entry.aliases ?? []) {
       addReference(alias, entry.id);

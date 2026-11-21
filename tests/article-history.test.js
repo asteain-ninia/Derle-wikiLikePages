@@ -59,12 +59,13 @@ test("summarizeArticleHistory は hash があれば古い版のページに使�
   assert.equal(toRevisionId("bbb2222222333333"), "bbb2222222");
 });
 
-test("parseCommitLog は git log --name-only の出力から、コミットごとのファイルの場所を読む", () => {
+test("parseCommitLog は git log --name-only の出力から、コミットごとのファイルの場所と日本時間の日付を読む", () => {
   const output = [
-    "\u0001aaa111\t2026-11-05\t脱字の修正",
+    // 2026-11-04T15:30:00Z = 日本時間 11-05 の 0 時半 (UTC では前の日)
+    "\u0001aaa111\t1793806200\t脱字の修正",
     "",
     "国/新しい名前.md",
-    "\u0001bbb222\t2026-06-05\tタブ\tを含む文言",
+    "\u0001bbb222\t1780628400\tタブ\tを含む文言",
     "",
     "国/昔の名前.md",
     "",

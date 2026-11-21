@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { selectPublishedFiles } from "../src/lib/vault-sync.js";
+import { planMirror, selectPublishedFiles } from "../src/lib/vault-sync.js";
 
 test("selectPublishedFiles keeps only 公開: true notes and the images they mention", () => {
   const notes = [
@@ -40,4 +40,11 @@ test("selectPublishedFiles distinguishes same-named images in different folders 
   const images = ["公開用/map.png", "非公開/map.png", "river.png", "river.png draft.png"];
 
   assert.deepEqual(selectPublishedFiles(notes, images).files, ["river.png draft.png", "公開.md", "公開用/map.png"]);
+});
+
+test("planMirror は大文字小文字だけ違う旧名も消す側に入れ、新しい名前で書き直させる", () => {
+  const plan = planMirror(["Foo.md", "Bar/a.md", "残す.md", "やめた.md"], ["foo.md", "bar/a.md", "残す.md"]);
+
+  assert.deepEqual(plan.remove, ["Foo.md", "Bar/a.md", "やめた.md"]);
+  assert.deepEqual([...plan.keep], ["残す.md"]);
 });

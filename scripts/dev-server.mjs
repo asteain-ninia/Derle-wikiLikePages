@@ -168,14 +168,35 @@ try {
   // 未設定なら content/ だけを監視する
 }
 
+// 同期は 1 本ずつ走らせる。重なると、古い方の同期が新しく公開した原稿を「目標に無い」として消しうる
 let syncTimer = null;
+let syncRunning = false;
+let syncQueued = false;
+
+async function runSync() {
+  if (syncRunning) {
+    syncQueued = true;
+    return;
+  }
+
+  syncRunning = true;
+  try {
+    await syncVault({ log: (message) => console.log(message) });
+  } catch (error) {
+    console.error(`[sync] 失敗しました: ${error.message}`);
+  } finally {
+    syncRunning = false;
+  }
+
+  if (syncQueued) {
+    syncQueued = false;
+    runSync();
+  }
+}
+
 function scheduleSync() {
   clearTimeout(syncTimer);
-  syncTimer = setTimeout(() => {
-    syncVault({ log: (message) => console.log(message) }).catch((error) => {
-      console.error(`[sync] 失敗しました: ${error.message}`);
-    });
-  }, 300);
+  syncTimer = setTimeout(runSync, 300);
 }
 
 if (vaultPath && existsSync(vaultPath)) {

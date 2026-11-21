@@ -657,3 +657,14 @@ test("buildArticlePageModel の見出しのリンクは表示文字を書かれ�
 test("parseAppRoute は #!maintenance を保守レポートのページにする", () => {
   assert.deepEqual(parseAppRoute("#!maintenance"), { view: "maintenance" });
 });
+
+test("buildReferenceIndex は Obsidian のパス付きリンク [[国/アクセル]] を記事 ID で解決する", () => {
+  const entries = [{ id: "国/アクセル", title: "アクセル", aliases: [], sections: [] }];
+  const referenceIndex = buildReferenceIndex(entries);
+  const entryById = new Map(entries.map((entry) => [entry.id, entry]));
+
+  const resolution = resolveArticleReference(referenceIndex, entryById, "国/アクセル");
+  assert.equal(resolution.type, "article");
+  assert.equal(resolution.entry.id, "国/アクセル");
+  assert.equal(resolveArticleReference(referenceIndex, entryById, "アクセル").type, "article");
+});

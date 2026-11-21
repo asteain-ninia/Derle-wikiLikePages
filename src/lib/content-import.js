@@ -776,6 +776,16 @@ function processNowiki(text) {
   return { text: processed, placeholders };
 }
 
+// HTML の注釈 <!-- … --> を取り込みの最初に除く (表・引用・テンプレートの値・<ref> の中にあっても描画されない)。
+// コード (<syntaxhighlight> / <source> とバッククォート) の中の注釈はコードの一部として残す。
+// 注釈だけの行は改行ごと除き、段落やリストを分けない
+const CODE_OR_COMMENT =
+  /(<(syntaxhighlight|source)(?:\s[^>]*)?>[\s\S]*?<\/\2>|`[^`\n]+`)|(^[ \t]*<!--[\s\S]*?-->[ \t]*(?:\n|$)|<!--[\s\S]*?-->)/gim;
+
+function stripHtmlComments(text) {
+  return text.replace(CODE_OR_COMMENT, (match, code) => code ?? "");
+}
+
 function restoreNowiki(text, placeholders) {
   return text.replace(/\x00NOWIKI:(\d+)\x00/g, (_match, index) => {
     const content = placeholders[Number(index)] ?? "";
@@ -1503,7 +1513,7 @@ export function buildArticleRecord({
   const { text: nowikiProcessed, placeholders: nowikiPlaceholders } =
     processNowiki(sourceWithoutFrontmatter);
   // 織機のテンプレートは、冒頭のテンプレート (インフォボックスなど) として抜き出される前に展開する
-  const magicStripped = expandLoomTemplates(stripMagicWords(nowikiProcessed));
+  const magicStripped = expandLoomTemplates(stripMagicWords(stripHtmlComments(nowikiProcessed)));
   const { templates, body: bodyWithoutLeadingTemplates } =
     extractLeadingTemplates(magicStripped);
   const { text: bodyWithoutCategories, categoryTags } =

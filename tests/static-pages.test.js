@@ -298,7 +298,7 @@ test("ヘッダーは index.html のものを使い、検索欄は SPA へ ?q= �
   assert.throws(() => buildStaticSiteHeader("<html></html>", "../"), /site-header/);
 });
 
-test("sitemap.xml にメインページと静的ページを並べ、robots.txt から指す", () => {
+test("sitemap.xml にメインページと静的ページを並べる。robots.txt はサイトがドメインの直下にあるときだけ作る", () => {
   const site = buildFixtureSite();
   const locs = [...site.sitemap.matchAll(/<loc>([^<]*)<\/loc>/g)].map((match) => match[1]);
   assert.equal(locs[0], SITE_URL);
@@ -308,7 +308,10 @@ test("sitemap.xml にメインページと静的ページを並べ、robots.txt 
   }
   assert.match(site.sitemap, /^<\?xml version="1.0" encoding="UTF-8"\?>/);
   assert.match(site.sitemap, /<lastmod>2026-04-01<\/lastmod>/);
-  assert.match(site.robots, new RegExp(`Sitemap: ${SITE_URL}sitemap.xml`));
+  // プロジェクトページ (…/wiki/) の下の robots.txt は検索エンジンに読まれない
+  assert.equal(site.robots, null);
+  const rootSite = buildFixtureSite({ siteUrl: "https://example.com/" });
+  assert.match(rootSite.robots, /Sitemap: https:\/\/example\.com\/sitemap\.xml/);
 });
 
 test("SPA の入口にもメインページの canonical と OGP を足す", () => {

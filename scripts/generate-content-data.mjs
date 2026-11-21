@@ -11,7 +11,7 @@ import { loadTemplateHandlers } from "../src/lib/template-registry.js";
 import { buildBuildArtifacts } from "../src/lib/build-artifacts.js";
 import { readImageSize } from "../src/lib/image-size.js";
 import { summarizeArticleHistory, toHistoryMessage, toRevisionId } from "../src/lib/article-history.js";
-import { getVaultCommits, readVaultFileAt, resolveVaultRepository } from "./vault-git.mjs";
+import { formatJstDate, getVaultCommits, readVaultFileAt, resolveVaultRepository } from "./vault-git.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -26,14 +26,6 @@ const revisionsPath = path.join(revisionsDir, "article-revisions.json");
 
 function toPosixPath(value) {
   return value.split(path.sep).join("/");
-}
-
-function formatDate(dateLike) {
-  if (typeof dateLike === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dateLike)) {
-    return dateLike;
-  }
-
-  return new Date(dateLike).toISOString().slice(0, 10);
 }
 
 const CONTENT_FILE_EXTENSIONS = /\.(md|wiki|txt)$/i;
@@ -80,8 +72,8 @@ async function getFileHistory(absolutePath, vaultRelativePath) {
 
   const fileStats = await stat(absolutePath);
   return {
-    created: formatDate(fileStats.birthtimeMs || fileStats.ctimeMs || fileStats.mtimeMs),
-    updated: formatDate(fileStats.mtimeMs),
+    created: formatJstDate(fileStats.birthtimeMs || fileStats.ctimeMs || fileStats.mtimeMs),
+    updated: formatJstDate(fileStats.mtimeMs),
     history: [],
     commits: [],
   };

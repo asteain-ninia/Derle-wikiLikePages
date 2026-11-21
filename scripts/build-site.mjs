@@ -89,8 +89,9 @@ for (const page of staticSite.pages) {
 }
 await writeFile(path.join(distRoot, "index.html"), staticSite.homeHtml, "utf8");
 await writeFile(path.join(distRoot, "sitemap.xml"), staticSite.sitemap, "utf8");
-// robots.txt を自分で置いていればそちらを使う (上の optionalEntries でコピー済み)
-if (!(await pathExists(path.join(projectRoot, "robots.txt")))) {
+// robots.txt を自分で置いていればそちらを使う (上の optionalEntries でコピー済み)。
+// サイトがドメインの直下に無いときは作らない (buildRobotsTxt)
+if (staticSite.robots && !(await pathExists(path.join(projectRoot, "robots.txt")))) {
   await writeFile(path.join(distRoot, "robots.txt"), staticSite.robots, "utf8");
 }
 

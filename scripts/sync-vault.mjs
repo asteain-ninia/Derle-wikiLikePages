@@ -8,7 +8,7 @@ import { lstat, mkdir, readFile, readdir, realpath, rm, rmdir, writeFile } from 
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { IMAGE_FILE, NOTE_FILE, selectPublishedFiles } from "../src/lib/vault-sync.js";
+import { IMAGE_FILE, NOTE_FILE, planMirror, selectPublishedFiles } from "../src/lib/vault-sync.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const projectRoot = path.resolve(path.dirname(__filename), "..");
@@ -66,10 +66,6 @@ async function removeEmptyDirectories(directoryPath) {
   if (directoryPath !== contentRoot && (await readdir(directoryPath)).length === 0) {
     await rmdir(directoryPath);
   }
-}
-
-async function sameContent(buffer, filePath) {
-  return existsSync(filePath) && buffer.equals(await readFile(filePath));
 }
 
 function isInside(childPath, parentPath) {
@@ -135,25 +131,28 @@ export async function syncVault({ log = console.log } = {}) {
   }
 
   await mkdir(contentRoot, { recursive: true });
-  const targetFiles = new Set(selection.files);
+  // 目標と名前が完全には一致しないもの (大文字小文字だけ違う旧名を含む) を書き込みより先に消す。
+  // 有無は existsSync ではなく実際の名前で判断する (Windows では旧名 Foo.md があると foo.md も「ある」になる)。
+  // フォルダの改名も、旧名のフォルダが空になって消えてから新しい名前で作り直される
+  const plan = planMirror(await listFiles(contentRoot), selection.files);
+  for (const filePath of plan.remove) {
+    await rm(path.join(contentRoot, filePath));
+  }
+  await removeEmptyDirectories(contentRoot);
+
   let copiedCount = 0;
   for (const filePath of selection.files) {
     const destinationPath = path.join(contentRoot, filePath);
     const noteBuffer = noteBuffers.get(filePath);
     const buffer = noteBuffer ?? (await readFile(path.join(vaultPath, filePath)));
-    if (await sameContent(buffer, destinationPath)) {
+    if (plan.keep.has(filePath) && buffer.equals(await readFile(destinationPath))) {
       continue;
     }
     await mkdir(path.dirname(destinationPath), { recursive: true });
     await writeFile(destinationPath, buffer);
     copiedCount += 1;
   }
-
-  const removedFiles = (await listFiles(contentRoot)).filter((filePath) => !targetFiles.has(filePath));
-  for (const filePath of removedFiles) {
-    await rm(path.join(contentRoot, filePath));
-  }
-  await removeEmptyDirectories(contentRoot);
+  const removedFiles = plan.remove;
 
   for (const notePath of selection.unreadableNotes) {
     log(`  frontmatter を解釈できないため公開しません: ${notePath}`);
