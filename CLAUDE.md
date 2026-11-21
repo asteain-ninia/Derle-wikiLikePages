@@ -2,7 +2,7 @@
 
 架空世界の個人用 Wiki。[WikiLikePages](https://github.com/asteain-ninia/WikiLikePages) を一人で執筆・公開する前提でフォークしたもの (2026-10-17)。
 
-- 公開: GitHub Pages のまま。Actions がテスト・ビルド・デプロイする。きっかけは、このリポジトリの `main` への push (コードの変更) と、手動実行 (`gh workflow run deploy-pages.yml`。記事を出すときはいまはこれ)。PR・レビュー・投稿経路は持たない
+- 公開: GitHub Pages のまま。Actions がテスト・ビルド・デプロイする。きっかけは、保管庫 (derle-vault) の push、このリポジトリの `main` への push (コードの変更)、手動実行 (`gh workflow run deploy-pages.yml`)。PR・レビュー・投稿経路は持たない
 - remote: `origin` = asteain-ninia/Derle-wikiLikePages, `upstream` = asteain-ninia/WikiLikePages (上流の修正を取り込むときに使う)
 - `docs/spec.md` などの設計文書は上流のもので、多人数・投稿経路に関する記述はこのフォークでは適用しない
 
@@ -12,7 +12,7 @@
 - `npm run sync` が保管庫から **frontmatter に `公開: true` がある原稿** と、それらが名前を書いている画像だけを `content/` にコピーする。`content/` は生成物で git に入れない (`.gitignore`)。保管庫に無いもの・公開をやめたものは消える。`content/` を直接編集しない・コミットしない
 - 保管庫の場所は PC ごとに `local.config.json` (`{ "vaultPath": "…" }`、git 管理外) か環境変数 `DERLE_VAULT` で指定
 - `npm run dev` は保管庫も監視し、保存のたびに同期 → ビルド → ブラウザ再読み込み
-- 公開の流れ: 保管庫の記事に `公開: true` を書く → 保管庫でコミット → push → Actions を実行。Actions は保管庫を読み取り専用の deploy key (このリポジトリの secret `VAULT_DEPLOY_KEY`) で取得し、その中で sync とビルドをする (`.github/workflows/deploy-pages.yml`)。保管庫の push で自動的に Actions を起こす仕組み (`repository_dispatch` の `vault-updated`) は受け口だけあり、保管庫側は未設定
+- 公開の流れ: 保管庫の記事に `公開: true` を書く → 保管庫でコミット → push。あとは自動で出る。Actions は保管庫を読み取り専用の deploy key (このリポジトリの secret `VAULT_DEPLOY_KEY`) で取得し、その中で sync とビルドをする (`.github/workflows/deploy-pages.yml`)。保管庫の push では、保管庫側のワークフロー (`.github/workflows/notify-site.yml`) が `repository_dispatch` (`vault-updated`) でこのリポジトリの Actions を起こす。使うのは保管庫の secret `SITE_DISPATCH_TOKEN` (このリポジトリの Contents だけに書き込める fine-grained トークン、期限なし、2026-11-22 発行)
 - 記事の更新履歴 = 保管庫のコミットの文言 (Wikipedia の編集要約と同じ扱い)。保管庫でその記事に触れたコミットは全部載る。載せたくないコミット (`公開: true` の付与、機械的な一括整理など) は文言を `chore:` で始める。記事の「作成」日は最初のコミット、「更新」日は履歴に載るコミットの最新。日付は著者の日付 (`%at`) を日本時間で数える (`scripts/vault-git.mjs`、`src/lib/article-history.js`)
 - 履歴の文言は、その時点の版のページ `article/<記事 ID>/rev/<コミットの短い名前>/` へのリンク。`build:content` が保管庫の git から昔の原稿を読んで `.generated/article-revisions.json` (git 管理外、`src/` の外) に書き、`build:site` と開発サーバーが静的ページにする (`buildStaticRevisionPage`)。公開前の版も載せる。古い版のページは noindex で sitemap に入れず、昔の版にしか無い画像は出ない
 - frontmatter は単純な形 (空行 / `キー: 値` / `- 項目`) だけを解釈し、読めない形式は公開しない (fail-closed)。sync が名前を表示する

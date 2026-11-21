@@ -20,7 +20,7 @@ GitHub Pages で公開しつつ、Wikiライクな執筆体験は外部エディ
 - リポジトリ直下に `local.config.json` (git 管理外) を作り、保管庫の場所を書きます: `{ "vaultPath": "C:/Users/…/出界百科" }` (環境変数 `DERLE_VAULT` でも可)
 - `npm run sync` で、frontmatter に `公開: true` がある原稿と、それらが名前を書いている画像だけを `content/` にコピーします。保管庫に無いもの・公開をやめたものは `content/` から消えます
 - 記事のコミットは保管庫でします。保管庫でその記事に触れたコミットの文言が、記事の更新履歴 (編集要約) として表示され、文言からその時点の版のページを開けます。履歴に載せたくないコミットは文言を `chore:` で始めます
-- 公開するには、保管庫でコミットして push したあと、Actions の Deploy GitHub Pages を実行します (`gh workflow run deploy-pages.yml`)
+- 公開するには、保管庫でコミットして push します。保管庫の push をきっかけに Actions の Deploy GitHub Pages が自動で動きます (手で動かすなら `gh workflow run deploy-pages.yml`)
 - frontmatter は単純な形 (`キー: 値` と `- 項目`) だけを解釈し、読めない形式の原稿は公開しません (名前を表示します)
 
 ## 実行メモ

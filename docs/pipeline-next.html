@@ -121,13 +121,13 @@
 
   <figure>
     <h2>いま</h2>
-    <div class="frame"><svg id="now" viewBox="0 0 1000 385" role="img" aria-label="いまの状態。Obsidian で保管庫に書いてコミットし、GitHub の非公開リポジトリ derle-vault に push する。公開リポジトリの GitHub Actions を手で起こすと、Actions が保管庫を取得して公開: true の記事と画像だけを選び、織機のテンプレートを展開し、保管庫のコミットから更新履歴と古い版のページを作って GitHub Pages に出す。地図と気候の道具はサイトの記事データをまだ読んでいない。"></svg></div>
-    <figcaption>正本は保管庫ひとつ (本文も履歴も)。公開リポジトリはコードだけで、content/ は Actions の中でその場で作る。残っている手作業は、push のあとに Actions を起こすことと、地図の画像を作って保管庫に置くこと。織機はサイトに入ったが、テンプレートを書いた記事はまだ無い。</figcaption>
+    <div class="frame"><svg id="now" viewBox="0 0 1000 385" role="img" aria-label="いまの状態。Obsidian で保管庫に書いてコミットし、GitHub の非公開リポジトリ derle-vault に push する。push をきっかけに公開リポジトリの GitHub Actions が動き、保管庫を取得して公開: true の記事と画像だけを選び、織機のテンプレートを展開し、保管庫のコミットから更新履歴と古い版のページを作って GitHub Pages に出す。地図と気候の道具はサイトの記事データをまだ読んでいない。"></svg></div>
+    <figcaption>正本は保管庫ひとつ (本文も履歴も)。公開リポジトリはコードだけで、content/ は Actions の中でその場で作る。push すれば自動で公開される (2026-11-22 から)。残っている手作業は、地図の画像を作って保管庫に置くこと。織機はサイトに入ったが、テンプレートを書いた記事はまだ無い。</figcaption>
   </figure>
 
   <figure>
     <h2>これから</h2>
-    <div class="frame"><svg id="next" viewBox="0 0 1000 385" role="img" aria-label="これからの状態。保管庫を push すると自動で公開リポジトリの GitHub Actions が動く。出星やシェル暦の記事が織機のテンプレートで数値を出す。地図と気候の道具がサイトの記事データを読み、国別地図や気候図を保管庫へ戻す。"></svg></div>
+    <div class="frame"><svg id="next" viewBox="0 0 1000 385" role="img" aria-label="これからの状態。出星やシェル暦の記事が織機のテンプレートで数値を出す。地図と気候の道具がサイトの記事データを読み、国別地図や気候図を保管庫へ戻す。"></svg></div>
     <figcaption>保管庫で「書く → コミット → push」をすれば、あとは全部自動で出る。数値は織機が計算し、地図と気候図は道具が記事データから作って保管庫に戻す。地図と気候の線は、2026-11-04 の「創作パイプライン」の図で目指した状態のうち、このサイトにつながる部分。</figcaption>
   </figure>
 
@@ -137,7 +137,7 @@
       <table>
         <thead><tr><th>こと</th><th>いま</th><th>これから</th><th>状態</th></tr></thead>
         <tbody>
-          <tr><td>デプロイのきっかけ</td><td>保管庫を push したあと、手で <code>gh workflow run deploy-pages.yml</code></td><td>保管庫の push で自動</td><td><span class="pill wait">トークン待ち</span> 仕組みは両側に入れてある。保管庫に secret <code>SITE_DISPATCH_TOKEN</code> を置けば動く</td></tr>
+          <tr><td>デプロイのきっかけ</td><td>保管庫の push で自動 (2026-11-22 から)</td><td>同じ</td><td><span class="pill ok">済み</span> 保管庫の secret <code>SITE_DISPATCH_TOKEN</code> (期限なし) を使う</td></tr>
           <tr><td>織機を記事で使う</td><td>テンプレートを書いた記事は 0 件</td><td>出星・シェル暦などの数値を <code>{{織機|…}}</code> で出し、<code>{{計算機|…}}</code> を置く</td><td><span class="pill todo">未着手</span> 下書きは保管庫の <code>引き継ぎ/2026-11-04 …/下書き/</code> にある</td></tr>
           <tr><td>未査読の記事</td><td>保管庫 203 件のうち公開 26 件、未査読の印 168 件</td><td>査読して印を外し、<code>公開: true</code> を付ける</td><td><span class="pill wait">継続</span> 付けるコミットは <code>chore:</code> で始めると履歴に載らない</td></tr>
           <tr><td>地図・気候図</td><td>国別地図は手作業 (3 枚)</td><td>visualizer と ExoClim-3 がサイトの記事データを読み、画像を保管庫へ戻す</td><td><span class="pill todo">未接続</span> 道具の側の作業</td></tr>
@@ -154,7 +154,7 @@
     <ul>
       <li><b>1. 保管庫で書く。</b> 出したい記事には frontmatter に <code>公開: true</code> を書く。手元で確かめるなら、このリポジトリで <code>npm run dev</code>。</li>
       <li><b>2. 保管庫でコミットして push する。</b> 文言がそのまま記事の更新履歴 (編集要約) になる。</li>
-      <li><b>3. Actions を起こす。</b> <code>gh workflow run deploy-pages.yml -R asteain-ninia/Derle-wikiLikePages</code>。自動デプロイを設定した後は要らない。</li>
+      <li><b>3. 待つ。</b> push をきっかけに Actions が動き、1 分ほどで公開される。手で動かすなら <code>gh workflow run deploy-pages.yml -R asteain-ninia/Derle-wikiLikePages</code>。</li>
     </ul>
   </section>
 
@@ -453,7 +453,6 @@
     "to": "actions",
     "sb": "l",
     "ob": 12,
-    "kind": "warn",
     "via": [
       [
         315,
@@ -468,7 +467,7 @@
         166
       ]
     ],
-    "label": "手で起こす (gh workflow run)",
+    "label": "push で自動的に起こす",
     "seg": 2
   },
   {
@@ -705,7 +704,6 @@
     "to": "actions",
     "sb": "l",
     "ob": 12,
-    "kind": "new",
     "via": [
       [
         315,

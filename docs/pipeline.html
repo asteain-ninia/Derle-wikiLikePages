@@ -145,7 +145,7 @@
           <tr><td>画像</td><td>公開記事が名前を書いている画像だけを写す</td><td>同じ</td><td><span class="pill ok">変わらない</span></td></tr>
           <tr><td>手元の確認</td><td><code>npm run dev</code> が保管庫を監視し、保存のたびに作り直す</td><td>同じ。履歴も保管庫の git から出る</td><td><span class="pill ok">変わらない</span></td></tr>
           <tr><td>ページの中身</td><td>SPA・記事ごとの静的ページ・固定リンク・カテゴリ・sitemap・保守レポート・織機の計算機</td><td>同じ</td><td><span class="pill ok">変わらない</span> 描画のコードには触れない</td></tr>
-          <tr><td>デプロイのきっかけ</td><td>公開リポジトリの main へ push</td><td>コードの push と手動実行。保管庫の push で起こす仕組みは、トークンを置けば動く</td><td><span class="pill wait">半分</span> 読み取りの鍵は設定済み</td></tr>
+          <tr><td>デプロイのきっかけ</td><td>公開リポジトリの main へ push</td><td>保管庫の push (自動)、コードの push、手動実行</td><td><span class="pill ok">済み</span> 2026-11-22 に自動化</td></tr>
           <tr><td>保管庫の控え</td><td>OneDrive だけ。git の履歴も OneDrive の中</td><td>GitHub にも履歴ごと残る</td><td><span class="pill ok">増える</span></td></tr>
           <tr><td>上流の取り込み</td><td><code>upstream</code> から merge</td><td>同じ。content/ が git から外れるので衝突は減る</td><td><span class="pill ok">変わらない</span></td></tr>
         </tbody>
@@ -209,7 +209,7 @@
     <ul>
       <li><b>1. 保管庫の履歴を整えた。</b> 並べ直す前の履歴を控え、上の 4 件を積んだ。<code>debug.log</code> と PC ごとに変わる <code>.obsidian/workspace*.json</code> は <code>.gitignore</code> で外し、残りの未コミット分 (未公開記事、<code>引き継ぎ/</code> など) をコミットした。</li>
       <li><b>2. 保管庫のフォルダ名を「出界百科」にし、GitHub の非公開リポジトリ <code>derle-vault</code> に push した。</b> メイン PC も同じ状態に合わせた。</li>
-      <li><b>3. 鍵を置いた。</b> Actions が保管庫を読むための読み取り専用の deploy key (公開リポジトリの secret <code>VAULT_DEPLOY_KEY</code>)。保管庫の push を知らせるトークン (保管庫の secret <code>SITE_DISPATCH_TOKEN</code>) は別途。</li>
+      <li><b>3. 鍵を置いた。</b> Actions が保管庫を読むための読み取り専用の deploy key (公開リポジトリの secret <code>VAULT_DEPLOY_KEY</code>)。保管庫の push を知らせるトークン (保管庫の secret <code>SITE_DISPATCH_TOKEN</code>) は 2026-11-22 に置いた。</li>
       <li><b>4. コードを変えた。</b> 履歴を保管庫の git から作る、古い版のページを作る、content/ を git から外す、Actions で保管庫を取得して sync する。</li>
       <li><b>5. 織機 (自前の惑星計算機) のブランチを main に入れた。</b></li>
     </ul>
