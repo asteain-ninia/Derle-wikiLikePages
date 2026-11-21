@@ -1093,3 +1093,40 @@ test("buildArticleRecord は HTML の注釈を表・引用・テンプレート�
   const withoutCode = JSON.stringify({ ...article, sections: [{ paragraphs: paragraphs.slice(0, -1) }] });
   assert.doesNotMatch(withoutCode, /<!--|-->|未定|要確認|仮/);
 });
+
+test("buildArticleRecord は埋め込みの画像 ![[…]] を関連記事に入れない", () => {
+  const article = buildArticleRecord({
+    relativePath: "test.md",
+    fileBasename: "テスト",
+    created: "2026-03-20",
+    updated: "2026-03-23",
+    sourceText: "![[地図.png]] と [[アクセル]] と [[ファイル:写真.jpg]]",
+  });
+
+  assert.deepEqual(article.relatedTitles, ["アクセル"]);
+});
+
+test("buildArticleRecord は閉じ忘れの表・poem・syntaxhighlight・テンプレートで後ろの本文を消さない", () => {
+  const build = (sourceText) =>
+    buildArticleRecord({
+      relativePath: "test.md",
+      fileBasename: "テスト",
+      created: "2026-03-20",
+      updated: "2026-03-23",
+      sourceText,
+    }).sections.flatMap((section) => section.paragraphs);
+
+  const table = build(["{|", "| セル", "", "後ろの段落"].join("\n"));
+  assert.equal(table[0].type, "table");
+  assert.equal(table[0].rows[0][0].text, "セル");
+  assert.equal(table[1], "後ろの段落");
+
+  assert.match(JSON.stringify(build(["<poem>", "詩の行", "", "後ろの段落"].join("\n"))), /詩の行[\s\S]*後ろの段落/);
+  assert.match(
+    JSON.stringify(build(['<syntaxhighlight lang="js">', "const a = 1;", "", "後ろの段落"].join("\n"))),
+    /const a = 1;[\s\S]*後ろの段落/
+  );
+  assert.match(JSON.stringify(build("前の文{{未完のテンプレート 後ろの文")), /前の文\{\{未完のテンプレート 後ろの文/);
+  // 閉じていれば今までどおり
+  assert.deepEqual(build("前{{除く}}後"), ["前後"]);
+});

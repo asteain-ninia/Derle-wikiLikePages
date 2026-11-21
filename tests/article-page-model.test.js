@@ -668,3 +668,37 @@ test("buildReferenceIndex は Obsidian のパス付きリンク [[国/アクセ�
   assert.equal(resolution.entry.id, "国/アクセル");
   assert.equal(resolveArticleReference(referenceIndex, entryById, "アクセル").type, "article");
 });
+
+test("parseAppRoute は壊れたパーセントエスケープでも例外を投げず、書かれた文字のまま返す", () => {
+  assert.deepEqual(parseAppRoute("#!article/%"), { view: "article", entryId: "%", sectionHeading: "" });
+  assert.deepEqual(parseAppRoute("#!missing/%E3"), { view: "missing", title: "%E3" });
+  assert.deepEqual(parseAppRoute("#!category/%zz"), { view: "category", category: "%zz" });
+});
+
+test("buildArticlePageModel は表・引用・インフォボックス・脚注・main の中の赤リンクも数える", () => {
+  const entries = [
+    {
+      id: "a",
+      title: "記事A",
+      aliases: [],
+      sections: [
+        {
+          heading: "概要",
+          paragraphs: [
+            "[[未作成1]]",
+            { type: "table", caption: "", rows: [[{ isHeader: false, text: "[[未作成2]]" }]] },
+            { type: "blockquote", body: "[[未作成3]]" },
+            { type: "main-article", articleName: "未作成4" },
+            { type: "poem", body: "[[未作成5]]" },
+            { type: "definition-list", items: [{ term: "[[未作成6]]", description: "[[記事A]]" }] },
+          ],
+        },
+      ],
+      templateModels: [{ type: "infobox", rows: [{ label: "首都", value: "[[未作成7]]" }] }],
+      footnotes: ["[[未作成8]]"],
+    },
+  ];
+  const pageModel = buildArticlePageModel(buildWikiGraph(entries), "a");
+
+  assert.equal(pageModel.unresolvedLinkCount, 8);
+});

@@ -103,12 +103,14 @@ function mergeParagraphLine(currentParagraph, nextLine) {
   return `${currentParagraph}${nextLine}`;
 }
 
+// 本文中のテンプレート {{…}} を除く。閉じ }} が無い {{ は書き損じとみなし、そこから後ろを消さずに字のまま残す
 function stripInlineTemplates(text) {
   let result = "";
 
   for (let index = 0; index < text.length; index += 1) {
     const pair = text.slice(index, index + 2);
     if (pair === "{{") {
+      const templateStart = index;
       let depth = 1;
       index += 2;
 
@@ -127,6 +129,10 @@ function stripInlineTemplates(text) {
         }
 
         index += 1;
+      }
+
+      if (depth > 0) {
+        return result + text.slice(templateStart);
       }
 
       index -= 1;
@@ -442,6 +448,15 @@ function parseMediaWikiTable(lines, startIndex) {
     return null;
   }
 
+  // 閉じ |} が無い表は書き損じとみなし、最初の空行で表を終える (後ろの本文を表に飲み込まない)
+  let limitIndex = lines.findIndex((line, index) => index > startIndex && line.trim() === "|}");
+  if (limitIndex === -1) {
+    limitIndex = lines.findIndex((line, index) => index > startIndex && line.trim() === "");
+  }
+  if (limitIndex === -1) {
+    limitIndex = lines.length;
+  }
+
   const rows = [];
   let caption = "";
   let currentRow = null;
@@ -468,6 +483,9 @@ function parseMediaWikiTable(lines, startIndex) {
   }
 
   while (endIndex < lines.length) {
+    if (endIndex === limitIndex && lines[endIndex].trim() !== "|}") {
+      break;
+    }
     const line = lines[endIndex].trim();
 
     if (line === "|}") {
@@ -870,6 +888,12 @@ function measureIndent(rawLine) {
   return width;
 }
 
+// lines[startIndex] から後ろに </tagName> があるか
+function hasClosingTagFrom(lines, startIndex, tagName) {
+  const closingTag = new RegExp(`</${tagName}>`, "i");
+  return lines.slice(startIndex).some((line) => closingTag.test(line));
+}
+
 function buildParagraphs(lines) {
   const paragraphs = [];
   let currentParagraph = "";
@@ -1000,7 +1024,8 @@ function buildParagraphs(lines) {
     }
 
     // <poem> block
-    if (/<poem>/i.test(trimmed)) {
+    // 閉じタグが無ければ書き損じとみなし、ブロックにせず普通の行として読む (後ろの本文を消さない)
+    if (/<poem>/i.test(trimmed) && hasClosingTagFrom(lines, lineIndex, "poem")) {
       flushParagraph();
       let content = "";
       let poemEndIndex = lineIndex;
@@ -1021,7 +1046,7 @@ function buildParagraphs(lines) {
 
     // <syntaxhighlight> / <source> block
     const codeTagMatch = /^<(syntaxhighlight|source)(?:\s[^>]*)?>/.exec(trimmed);
-    if (codeTagMatch) {
+    if (codeTagMatch && hasClosingTagFrom(lines, lineIndex, codeTagMatch[1])) {
       flushParagraph();
       const closingTag = codeTagMatch[1];
       let content = "";
@@ -1380,19 +1405,18 @@ function buildUniqueList(values, maxItems = Infinity) {
   return result;
 }
 
+// 本文中の記事へのリンク先 (関連記事・検索語に使う)。画像などの埋め込み ![[…]] は記事へのリンクではないので除く
 function extractWikiLinkTargets(text) {
   const matches = [];
-  const pattern = /\[\[([^[\]]+?)\]\]/g;
-  let match = pattern.exec(text);
-
-  while (match) {
-    const [targetPart] = match[1].split("|");
+  for (const [, embedMark, token] of text.matchAll(/(!?)\[\[([^[\]]+?)\]\]/g)) {
+    if (embedMark) {
+      continue;
+    }
+    const [targetPart] = token.split("|");
     const [pageTitle] = targetPart.split("#");
     if (pageTitle.trim()) {
       matches.push(pageTitle.trim());
     }
-
-    match = pattern.exec(text);
   }
 
   return matches;

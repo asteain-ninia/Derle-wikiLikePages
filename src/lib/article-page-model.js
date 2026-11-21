@@ -240,6 +240,16 @@ export function buildSectionAnchorId(heading) {
   return `section-${encodeURIComponent(heading).replace(/%/g, "-").toLowerCase()}`;
 }
 
+// 壊れたパーセントエスケープ (#!article/% など) は URIError を投げるので、そのときは書かれた文字のまま使う
+// (画面が出なくなる代わりに、見つからない記事として表示される)
+function decodeRoutePart(value) {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
 export function parseAppRoute(hash) {
   if (!hash.startsWith("#!")) {
     return { view: "home" };
@@ -252,29 +262,29 @@ export function parseAppRoute(hash) {
   if (view === "article" && parts[1]) {
     return {
       view: "article",
-      entryId: decodeURIComponent(parts[1]),
-      sectionHeading: parts[2] ? decodeURIComponent(parts.slice(2).join("/")) : "",
+      entryId: decodeRoutePart(parts[1]),
+      sectionHeading: parts[2] ? decodeRoutePart(parts.slice(2).join("/")) : "",
     };
   }
 
   if (view === "missing" && parts[1]) {
     return {
       view: "missing",
-      title: decodeURIComponent(parts.slice(1).join("/")),
+      title: decodeRoutePart(parts.slice(1).join("/")),
     };
   }
 
   if (view === "disambiguation" && parts[1]) {
     return {
       view: "disambiguation",
-      title: decodeURIComponent(parts.slice(1).join("/")),
+      title: decodeRoutePart(parts.slice(1).join("/")),
     };
   }
 
   if (view === "category" && parts[1]) {
     return {
       view: "category",
-      category: decodeURIComponent(parts.slice(1).join("/")),
+      category: decodeRoutePart(parts.slice(1).join("/")),
     };
   }
 
@@ -611,14 +621,20 @@ export function buildArticlePageModel(graph, entryId) {
     return null;
   }
 
+  // 未作成・曖昧なリンクの数。本文・表・引用・詩・定義リスト・インフォボックス・脚注・見出しのどこにあっても数える
   let unresolvedLinkCount = 0;
+  function segmentsOf(text, options) {
+    const segments = buildWikiTextSegments(text, graph, entry, options);
+    unresolvedLinkCount += segments.filter(
+      (segment) => segment.type === "link" && segment.status !== "resolved"
+    ).length;
+    return segments;
+  }
+
   const sections = (entry.sections ?? []).map((section) => {
     const paragraphs = (section.paragraphs ?? []).map((paragraph) => {
       if (typeof paragraph === "object" && paragraph.type === "callout") {
-        const bodySegments = buildWikiTextSegments(paragraph.body, graph, entry);
-        unresolvedLinkCount += bodySegments.filter(
-          (segment) => segment.type === "link" && segment.status !== "resolved"
-        ).length;
+        const bodySegments = segmentsOf(paragraph.body);
         return {
           type: "callout",
           calloutType: paragraph.calloutType,
@@ -631,39 +647,36 @@ export function buildArticlePageModel(graph, entryId) {
         const resolvedRows = paragraph.rows.map((row) =>
           row.map((cell) => ({
             ...cell,
-            segments: buildWikiTextSegments(cell.text, graph, entry),
+            segments: segmentsOf(cell.text),
           }))
         );
         return { ...paragraph, rows: resolvedRows };
       }
 
       if (typeof paragraph === "object" && paragraph.type === "blockquote") {
-        const bodySegments = buildWikiTextSegments(paragraph.body, graph, entry);
+        const bodySegments = segmentsOf(paragraph.body);
         return { ...paragraph, bodySegments };
       }
 
       if (typeof paragraph === "object" && paragraph.type === "list-item") {
-        const bodySegments = buildWikiTextSegments(paragraph.body, graph, entry);
-        unresolvedLinkCount += bodySegments.filter(
-          (segment) => segment.type === "link" && segment.status !== "resolved"
-        ).length;
+        const bodySegments = segmentsOf(paragraph.body);
         return { ...paragraph, bodySegments };
       }
 
       if (typeof paragraph === "object" && paragraph.type === "main-article") {
-        const segments = buildWikiTextSegments(`[[${paragraph.articleName}]]`, graph, entry);
+        const segments = segmentsOf(`[[${paragraph.articleName}]]`);
         return { ...paragraph, segments };
       }
 
       if (typeof paragraph === "object" && paragraph.type === "poem") {
-        const bodySegments = buildWikiTextSegments(paragraph.body, graph, entry);
+        const bodySegments = segmentsOf(paragraph.body);
         return { ...paragraph, bodySegments };
       }
 
       if (typeof paragraph === "object" && paragraph.type === "definition-list") {
         const items = paragraph.items.map((item) => ({
-          termSegments: buildWikiTextSegments(item.term, graph, entry),
-          descriptionSegments: buildWikiTextSegments(item.description, graph, entry),
+          termSegments: segmentsOf(item.term),
+          descriptionSegments: segmentsOf(item.description),
         }));
         return { ...paragraph, items };
       }
@@ -673,22 +686,16 @@ export function buildArticlePageModel(graph, entryId) {
         return paragraph;
       }
 
-      const segments = buildWikiTextSegments(paragraph, graph, entry);
-      unresolvedLinkCount += segments.filter(
-        (segment) => segment.type === "link" && segment.status !== "resolved"
-      ).length;
+      const segments = segmentsOf(paragraph);
       return segments;
     });
 
     // 見出しの中の [[リンク]] も本文と同じくリンクにする。目次と移動先の id は平文の heading のまま。
     // 表示文字は書かれたまま (目次と同じ) にし、画像の埋め込みは画像にしない (asWritten)。
     // タグを取り除くと空になる見出し (sourceHeading が "") は平文の heading (「節」) を使う
-    const headingSegments = buildWikiTextSegments(section.sourceHeading || section.heading, graph, entry, {
+    const headingSegments = segmentsOf(section.sourceHeading || section.heading, {
       asWritten: true,
     });
-    unresolvedLinkCount += headingSegments.filter(
-      (segment) => segment.type === "link" && segment.status !== "resolved"
-    ).length;
 
     return {
       heading: section.heading,
@@ -706,7 +713,7 @@ export function buildArticlePageModel(graph, entryId) {
         rows: model.rows.map((row) => ({
           label: row.label,
           value: row.value,
-          segments: buildWikiTextSegments(row.value, graph, entry),
+          segments: segmentsOf(row.value),
         })),
       };
     }
@@ -714,14 +721,16 @@ export function buildArticlePageModel(graph, entryId) {
     return model;
   });
 
+  const footnotes = (entry.footnotes ?? []).map((note) => ({
+    text: note,
+    segments: segmentsOf(note),
+  }));
+
   return {
     ...entry,
     aliases: entry.aliases ?? [],
     tags: entry.tags ?? [],
-    footnotes: (entry.footnotes ?? []).map((note) => ({
-      text: note,
-      segments: buildWikiTextSegments(note, graph, entry),
-    })),
+    footnotes,
     sections,
     templateModels,
     backlinks: graph.backlinksById[entry.id] ?? [],
