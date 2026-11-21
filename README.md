@@ -6,7 +6,7 @@ GitHub Pages で公開しつつ、Wikiライクな執筆体験は外部エディ
 
 2026-03-17 に試作品を `archive/prototypes/` へ隔離し、ルート配下は正式実装の着手点へ切り替えました。
 
-記事を書いて公開するまでの手順は [docs/usage.md](docs/usage.md) にあります。
+記事を書いて公開するまでの手順は [docs/usage.html](docs/usage.html) にあります。
 
 ## 現在の構成
 

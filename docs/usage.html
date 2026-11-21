@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<title>出界百科の使い方</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap">
+<style>
+  /* Layout: one column of reading width; the two diagrams share node positions so only the edges differ. */
+  :root {
+    --bg: #f4f6f6;
+    --fg: #1d2a2e;
+    --muted: #5d6d72;
+    --line: #8a9ba0;
+    --panel: #ffffff;
+    --bought: #e2e8ea;
+    --made: #d3ebe6;
+    --accent: #1c7c74;
+    --truth: #b8801a;
+    --warn: #c0392b;
+    --font-display: "Zen Kaku Gothic New", "Noto Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif;
+    --font-body: "Noto Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #16201f; --fg: #e6ecea; --muted: #9fb0ad; --line: #5f7471; --panel: #1d2a29;
+      --bought: #2b3639; --made: #1f3f3b; --accent: #5fc4b8; --truth: #e0a93f; --warn: #ef6f5f;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #16201f; --fg: #e6ecea; --muted: #9fb0ad; --line: #5f7471; --panel: #1d2a29;
+    --bought: #2b3639; --made: #1f3f3b; --accent: #5fc4b8; --truth: #e0a93f; --warn: #ef6f5f;
+    color-scheme: dark;
+  }
+  body {
+    background: var(--bg); color: var(--fg);
+    font-family: var(--font-body); font-size: 15px; line-height: 1.75;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 32px 64px;
+  }
+  main { max-width: 1040px; margin: 0 auto; display: grid; gap: 36px; }
+  header { display: grid; gap: 6px; }
+  h1 { font-family: var(--font-display); font-weight: 700; font-size: 30px; line-height: 1.25; margin: 0; letter-spacing: .01em; text-wrap: balance; }
+  h2 { font-family: var(--font-display); font-weight: 700; font-size: 20px; margin: 0; text-wrap: balance; }
+  .lede { color: var(--muted); max-width: 44em; margin: 0; }
+  .eyebrow { font-size: 12px; letter-spacing: .12em; color: var(--muted); text-transform: uppercase; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 10px 20px; font-size: 13px; color: var(--muted); align-items: center; }
+  .legend span { display: inline-flex; align-items: center; gap: 7px; }
+  .sw { width: 22px; height: 14px; border-radius: 3px; border: 1.5px solid var(--line); flex: none; }
+  .sw.bought { background: var(--bought); }
+  .sw.made { background: var(--made); }
+  .sw.data { background: var(--panel); border-radius: 8px; }
+  .sw.truth { background: var(--panel); border: 2.5px solid var(--truth); border-radius: 8px; }
+  .ln { width: 26px; height: 0; border-top: 2px solid var(--line); flex: none; }
+  .ln.warn { border-top: 2px dashed var(--warn); }
+  .ln.new { border-top: 2.5px solid var(--accent); }
+
+  figure { margin: 0; display: grid; gap: 10px; }
+  .frame { background: var(--panel); border: 1px solid color-mix(in srgb, var(--line) 45%, transparent); border-radius: 6px; overflow-x: auto; padding: 8px; }
+  svg { display: block; min-width: 760px; width: 100%; height: auto; }
+  figcaption { color: var(--muted); font-size: 13.5px; max-width: 60em; }
+
+  /* SVG classes (page CSS applies to inline SVG) */
+  .node rect { stroke: var(--line); stroke-width: 1.2; }
+  .node.bought rect { fill: var(--bought); rx: 2; }
+  .node.made rect { fill: var(--made); rx: 2; }
+  .node.data rect { fill: var(--panel); rx: 10; }
+  .node.truth rect { stroke: var(--truth); stroke-width: 2.6; }
+  .node.weak rect { stroke-dasharray: 4 3; }
+  .node text { fill: var(--fg); font-family: var(--font-body); }
+  .node .t { font-size: 12.5px; font-weight: 700; }
+  .node .s { font-size: 10px; fill: var(--muted); }
+  .badge { font-size: 9px; font-weight: 700; fill: var(--truth); letter-spacing: .1em; }
+  .note { font-size: 10px; fill: var(--warn); font-family: var(--font-body); paint-order: stroke; stroke: var(--panel); stroke-width: 4px; stroke-linejoin: round; }
+  .note.ok { fill: var(--accent); }
+  .edge { fill: none; stroke: var(--line); stroke-width: 1.5; }
+  .edge.warn { stroke: var(--warn); stroke-dasharray: 5 4; }
+  .edge.new { stroke: var(--accent); stroke-width: 2.4; }
+  .edge.faint { stroke-dasharray: 2 4; }
+  .elbl { font-size: 10px; fill: var(--muted); font-family: var(--font-body); paint-order: stroke; stroke: var(--panel); stroke-width: 4px; stroke-linejoin: round; }
+  .elbl.warn { fill: var(--warn); }
+  .elbl.new { fill: var(--accent); font-weight: 700; }
+  .rowlbl { font-size: 10px; fill: var(--muted); letter-spacing: .1em; font-family: var(--font-body); }
+
+  .tablewrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; min-width: 640px; }
+  th, td { text-align: left; vertical-align: top; padding: 9px 10px; border-bottom: 1px solid color-mix(in srgb, var(--line) 40%, transparent); }
+  th { font-size: 12px; color: var(--muted); font-weight: 500; letter-spacing: .06em; }
+  td:first-child { font-weight: 700; white-space: nowrap; }
+  .pill { display: inline-block; font-size: 11px; padding: 1px 8px; border-radius: 999px; border: 1px solid; white-space: nowrap; }
+  .pill.ok { color: var(--accent); border-color: var(--accent); }
+  .pill.wait { color: var(--truth); border-color: var(--truth); }
+  .pill.todo { color: var(--warn); border-color: var(--warn); }
+  .truthword { color: var(--truth); font-weight: 700; }
+
+  section { display: grid; gap: 12px; }
+  ul { margin: 0; padding-left: 1.3em; display: grid; gap: 6px; }
+  li { max-width: 60em; }
+  li b { font-weight: 700; }
+  @media (max-width: 600px) { h1 { font-size: 24px; } body { font-size: 14px; } }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+  /* 使い方のページで足すもの: コマンドの枠、行内のコード、長い見出し列 */
+  pre { margin: 0; background: var(--panel); border: 1px solid color-mix(in srgb, var(--line) 45%, transparent); border-radius: 6px; padding: 12px 14px; overflow-x: auto; font-size: 13px; line-height: 1.7; max-width: 60em; }
+  code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: .92em; }
+  p { margin: 0; max-width: 60em; }
+  td:first-child { white-space: normal; min-width: 10em; }
+  ol { margin: 0; padding-left: 1.5em; display: grid; gap: 6px; }
+  nav.toc { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13.5px; }
+  a { color: var(--accent); }
+</style>
+
+<main>
+  <header>
+    <div class="eyebrow">出界百科 / Derle-wikiLikePages · 2026-11-22 時点</div>
+    <h1>出界百科の使い方</h1>
+    <p class="lede">記事を書いて公開するまでの手順と、困ったときの見どころ。仕組みの図は <a href="pipeline-next.html">Derle-wikiLikePages 移行後</a>、移行の経緯は <a href="pipeline.html">移行の記録</a> にあります。</p>
+    <nav class="toc"><a href="#flow">ふだんの流れ</a><a href="#publish">記事を公開する・取り下げる</a><a href="#history">更新履歴に載るもの・載らないもの</a><a href="#old">古い版</a><a href="#dev">出す前に手元で確かめる</a><a href="#loom">数値と計算機</a><a href="#deploy">デプロイの様子を見る・手で動かす</a><a href="#trouble">うまくいかないとき</a><a href="#two">2 台の PC で使うとき</a><a href="#new">新しい PC で始めるとき</a><a href="#keys">鍵とトークン</a><a href="#backup">控え</a></nav>
+  </header>
+
+  <figure id="flow">
+    <h2>ふだんの流れ</h2>
+    <div class="frame"><svg id="flowfig" viewBox="0 0 1000 110" role="img" aria-label="Obsidian で書き、保管庫でコミットして push すると、GitHub Actions が自動で動いて出界百科に公開される。"></svg></div>
+    <figcaption>手でやるのは「書く・コミット・push」の 3 つだけ。push から 1 分ほどで <a href="https://asteain-ninia.github.io/Derle-wikiLikePages/">出界百科</a> に出る。このリポジトリ (Derle-wikiLikePages) での操作は要らない。</figcaption>
+    <pre><code>cd "C:/Users/…/OneDrive/ドキュメント/出界百科"
+git add -A
+git commit -m "ジンとの関連について追記"
+git push</code></pre>
+  </figure>
+
+  <section id="publish">
+    <h2>記事を公開する・取り下げる</h2>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>したいこと</th><th>やること</th></tr></thead>
+        <tbody>
+          <tr><td>記事を公開する</td><td>記事の先頭の frontmatter に <code>公開: true</code> を書く</td></tr>
+          <tr><td>公開をやめる</td><td><code>公開: true</code> を消す (または <code>公開: false</code> にする)。次のデプロイで記事も古い版のページも消える</td></tr>
+          <tr><td>画像を出す</td><td>公開する記事の中に画像のファイル名を書く (<code>![[地図.png]]</code> など)。どの公開記事にも名前が無い画像は出ない</td></tr>
+          <tr><td>記事の名前を変える</td><td>Obsidian でファイル名を変える。履歴は引き継がれるが、記事の URL は変わる (古い URL からの転送は無い)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>frontmatter は <code>キー: 値</code> と <code>- 項目</code> の単純な形だけを読む。読めない形の記事は、<code>公開: true</code> と書いてあっても出さない。</p>
+  </section>
+
+  <section id="history">
+    <h2>更新履歴に載るもの・載らないもの</h2>
+    <ul>
+      <li><b>保管庫でその記事に触れたコミットは、全部その記事の更新履歴に載る。</b> 文言がそのまま編集要約になる。公開する前のコミットも載る。</li>
+      <li><b>載せたくないコミットは、文言を <code>chore:</code> で始める。</b> <code>公開: true</code> を付けるだけのコミットや、機械的な一括の整理に使う。例: <code>chore: 公開する記事に 公開: true を付ける</code></li>
+      <li><b>「作成」日は最初のコミットの日、「更新」日は履歴に載るコミットのうち最新の日。</b> <code>chore:</code> のコミットでは更新日は動かない。</li>
+      <li><b>1 つのコミットで複数の記事を変えると、同じ文言がそれぞれの記事の履歴に載る。</b></li>
+    </ul>
+  </section>
+
+  <section id="old">
+    <h2>古い版</h2>
+    <ul>
+      <li><b>履歴の文言を押すと、その時点の版のページが開く。</b> 場所は <code>article/&lt;記事&gt;/rev/&lt;版&gt;/</code>。上部に「○年○月○日時点の古い版です」と最新の版へのリンクが出る。</li>
+      <li><b>公開する前の版も読める。</b></li>
+      <li><b>古い版のページは検索に載せない。</b> <code>noindex</code> を付け、sitemap にも入れていない。</li>
+      <li><b>昔の版にしか使われていない画像は表示されない。</b></li>
+    </ul>
+  </section>
+
+  <section id="dev">
+    <h2>出す前に手元で確かめる</h2>
+    <p>このリポジトリで次を実行し、<code>http://localhost:4173</code> を開く。</p>
+    <pre><code>npm run dev</code></pre>
+    <ul>
+      <li><b>保管庫を見張っていて、記事を保存するたびに作り直してブラウザを再読み込みする。</b> コミットしていない内容もそのまま見える。</li>
+      <li><b>保管庫の場所は、リポジトリ直下の <code>local.config.json</code> に書く。</b> PC ごとに置き、git には入らない。中身は <code>{ "vaultPath": "C:/Users/…/OneDrive/ドキュメント/出界百科" }</code></li>
+      <li><b>手元の <code>content/</code> と <code>.generated/</code> は自動で作られる生成物。</b> 編集もコミットもしない。</li>
+    </ul>
+  </section>
+
+  <section id="loom">
+    <h2>数値と計算機 (出界の織機)</h2>
+    <ul>
+      <li><b><code>{{織機|量|単位|有効数字}}</code></b> と書くと、ビルドのときに計算値に置き換わる。</li>
+      <li><b><code>{{計算機|単位}}</code> や <code>{{計算機|時刻}}</code></b> の行は、読者が数字を入れられる計算機になる。</li>
+      <li>量と単位の名前は <a href="loom.md">loom.md</a> にある。</li>
+    </ul>
+  </section>
+
+  <section id="deploy">
+    <h2>デプロイの様子を見る・手で動かす</h2>
+    <pre><code># 最近のデプロイ
+gh run list -R asteain-ninia/Derle-wikiLikePages --limit 3
+
+# 失敗したときの記録
+gh run view &lt;番号&gt; -R asteain-ninia/Derle-wikiLikePages --log-failed
+
+# 手でデプロイする
+gh workflow run deploy-pages.yml -R asteain-ninia/Derle-wikiLikePages</code></pre>
+    <p>デプロイが始まるきっかけは 3 つある。保管庫の push、このリポジトリの <code>main</code> への push (コードを変えたとき)、手での実行。</p>
+  </section>
+
+  <section id="trouble">
+    <h2>うまくいかないとき</h2>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>起きたこと</th><th>見るところ</th></tr></thead>
+        <tbody>
+          <tr><td>push したのに記事が出ない</td><td>記事に <code>公開: true</code> があるか。<code>gh run list</code> でデプロイが成功しているか。成功していれば、ブラウザの再読み込みを試す</td></tr>
+          <tr><td>push してもデプロイが始まらない</td><td><code>gh run list -R asteain-ninia/derle-vault --limit 1</code> で「Notify site」が動いたか。動いていて警告や失敗が出ていれば、トークン (下の表) を作り直す</td></tr>
+          <tr><td>デプロイが「Checkout vault」で失敗する</td><td>保管庫を読む鍵 (下の表) が消えたか、保管庫のリポジトリ名が変わった</td></tr>
+          <tr><td>デプロイが「Run tests」や「Build static site」で失敗する</td><td>コードか原稿の問題。<code>--log-failed</code> の記録で、止まった場所とエラーの文言を見る</td></tr>
+          <tr><td>履歴に出したくないコミットが出た</td><td>次から <code>chore:</code> で始める。push 済みのコミットの文言を直すのは履歴の書き換えになるので、どうしても消したいときだけ</td></tr>
+          <tr><td>画像が出ない</td><td>公開している記事の本文かインフォボックスに、その画像のファイル名が書かれているか</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="two">
+    <h2>2 台の PC で使うとき</h2>
+    <ul>
+      <li><b>2 台で同時に保管庫の git を使わない。</b> 保管庫は OneDrive で同期され、<code>.git</code> も一緒に同期される。もう 1 台で作業する前に、OneDrive の同期が終わるのを待つ。</li>
+      <li><b>競合コピーは消して構わない。</b> 2 台で Obsidian を開いたままにすると、OneDrive が <code>.obsidian/workspace-PC名-番号.json</code> を作ることがある。<code>.obsidian/workspace*.json</code> は git に入れていない。</li>
+      <li><b>このリポジトリは PC ごとに <code>git pull</code> する。</b> <code>local.config.json</code> も PC ごとに置く。</li>
+    </ul>
+  </section>
+
+  <section id="new">
+    <h2>新しい PC で始めるとき</h2>
+    <ol>
+      <li>OneDrive の同期で保管庫「出界百科」が届くのを待ち、Obsidian で開く。</li>
+      <li>このリポジトリを clone する。Node.js が要る (Actions は 24 を使っている)。追加で入れるパッケージは無い。</li>
+      <li>リポジトリ直下に <code>local.config.json</code> を作り、保管庫の場所を書く。</li>
+      <li><code>npm run dev</code> で表示を確かめる。</li>
+      <li><code>gh auth login</code> で GitHub にログインする (push と <code>gh</code> のコマンドに要る)。</li>
+    </ol>
+  </section>
+
+  <section id="keys">
+    <h2>鍵とトークン</h2>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>名前</th><th>置き場所</th><th>役目</th><th>期限</th></tr></thead>
+        <tbody>
+          <tr><td><code>VAULT_DEPLOY_KEY</code></td><td>Derle-wikiLikePages の secret。対になる公開鍵は derle-vault の Deploy keys「Derle-wikiLikePages Actions (read-only)」</td><td>Actions が非公開の保管庫を読む。読み取り専用</td><td>なし</td></tr>
+          <tr><td><code>SITE_DISPATCH_TOKEN</code></td><td>derle-vault の secret。中身は GitHub の fine-grained トークン「derle-vault notify」</td><td>保管庫の push をきっかけに、このリポジトリの Actions を起こす。届くのは Derle-wikiLikePages の Contents だけ</td><td>なし</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <ul>
+      <li><b>トークンを作り直す。</b> GitHub の Settings → Developer settings → Personal access tokens → Fine-grained tokens で「derle-vault notify」を Regenerate し、<code>gh secret set SITE_DISPATCH_TOKEN -R asteain-ninia/derle-vault</code> で貼り直す。</li>
+      <li><b>鍵を作り直す。</b> <code>ssh-keygen -t ed25519</code> で作る。公開鍵を <code>gh repo deploy-key add &lt;公開鍵&gt; -R asteain-ninia/derle-vault</code>、秘密鍵を <code>gh secret set VAULT_DEPLOY_KEY -R asteain-ninia/Derle-wikiLikePages &lt; &lt;秘密鍵&gt;</code> で登録し、手元のファイルを消す。</li>
+    </ul>
+  </section>
+
+  <section id="backup">
+    <h2>控え</h2>
+    <ul>
+      <li><b>保管庫の履歴は GitHub の非公開リポジトリ <code>asteain-ninia/derle-vault</code> に全部ある。</b> 保管庫の <code>.git</code> が壊れたら、直そうとせずにここから取り直す。</li>
+      <li><b>2026-11-21 に履歴を並べ直す前の状態も残してある。</b> ノート PC の <code>C:\Users\tatuk\vault-backup\Obsidian-vault-2026-11-21-pre-restack.bundle</code> と、保管庫の <code>refs/backup/pre-restack-2026-11-21</code>。</li>
+    </ul>
+  </section>
+</main>
+
+<script>
+(function () {
+  const W = 160, H = 48;
+  const COL = { A: 15, B: 215, C: 415, D: 615, E: 815 };
+  const ROW = { 1: 40, 2: 130, 3: 220, 4: 310, 5: 400 };
+  const NS = "http://www.w3.org/2000/svg";
+
+  function el(tag, attrs, text) {
+    const n = document.createElementNS(NS, tag);
+    for (const k in attrs) n.setAttribute(k, attrs[k]);
+    if (text != null) n.textContent = text;
+    return n;
+  }
+  function anchor(nd, side, off) {
+    off = off || 0;
+    const x = COL[nd.col], y = ROW[nd.row];
+    if (side === "r") return [x + W, y + H / 2 + off];
+    if (side === "l") return [x, y + H / 2 + off];
+    if (side === "t") return [x + W / 2 + off, y];
+    return [x + W / 2 + off, y + H];
+  }
+  function route(a, sa, b, sb, via) {
+    const pts = [a];
+    if (via && via.length) { for (const p of via) pts.push(p); pts.push(b); return pts; }
+    const horizA = sa === "l" || sa === "r", horizB = sb === "l" || sb === "r";
+    if (horizA && horizB) {
+      if (Math.abs(a[1] - b[1]) < 1) { pts.push(b); return pts; }
+      const mx = (a[0] + b[0]) / 2;
+      pts.push([mx, a[1]], [mx, b[1]], b); return pts;
+    }
+    if (!horizA && !horizB) {
+      if (Math.abs(a[0] - b[0]) < 1) { pts.push(b); return pts; }
+      const my = (a[1] + b[1]) / 2;
+      pts.push([a[0], my], [b[0], my], b); return pts;
+    }
+    if (horizA) { pts.push([b[0], a[1]], b); return pts; }
+    pts.push([a[0], b[1]], b); return pts;
+  }
+  function draw(svgId, nodes, edges, rows) {
+    const svg = document.getElementById(svgId);
+    const defs = el("defs", {});
+    for (const [id, cls] of [["arr", "var(--line)"], ["arrw", "var(--warn)"], ["arrn", "var(--accent)"]]) {
+      const m = el("marker", { id: svgId + "-" + id, viewBox: "0 0 10 10", refX: "9", refY: "5", markerWidth: "7", markerHeight: "7", orient: "auto-start-reverse" });
+      m.appendChild(el("path", { d: "M0,0 L10,5 L0,10 z", fill: cls }));
+      defs.appendChild(m);
+    }
+    svg.appendChild(defs);
+    for (const r of rows) svg.appendChild(el("text", { x: 2, y: ROW[r.row] - 8, class: "rowlbl" }, r.label));
+    const gE = el("g", {}), gN = el("g", {});
+    svg.appendChild(gE); svg.appendChild(gN);
+    for (const e of edges) {
+      const A = nodes[e.from], B = nodes[e.to];
+      const pts = route(anchor(A, e.sa, e.oa), e.sa, anchor(B, e.sb, e.ob), e.sb, e.via);
+      const d = pts.map((p, i) => (i ? "L" : "M") + p[0] + "," + p[1]).join(" ");
+      const cls = "edge" + (e.kind ? " " + e.kind : "");
+      const mk = e.kind === "warn" ? "arrw" : e.kind === "new" ? "arrn" : "arr";
+      gE.appendChild(el("path", { d, class: cls, "marker-end": "url(#" + svgId + "-" + mk + ")" }));
+      if (e.label) {
+        let best = 0, bi = 0;
+        for (let i = 1; i < pts.length; i++) {
+          const len = Math.abs(pts[i][0] - pts[i - 1][0]) + Math.abs(pts[i][1] - pts[i - 1][1]);
+          if (len > best) { best = len; bi = i; }
+        }
+        if (e.seg != null) bi = e.seg;
+        const p = pts[bi - 1], q = pts[bi];
+        const vertical = Math.abs(p[0] - q[0]) < 1;
+        const lx = (p[0] + q[0]) / 2 + (e.dx || 0), ly = (p[1] + q[1]) / 2 + (e.dy || (vertical ? 0 : -5));
+        const t = el("text", { x: lx, y: ly, class: "elbl" + (e.kind === "warn" ? " warn" : e.kind === "new" ? " new" : ""), "text-anchor": vertical ? (e.ta || "start") : "middle", "dominant-baseline": vertical ? "middle" : "auto" }, e.label);
+        if (vertical && !e.ta) t.setAttribute("x", lx + 6);
+        gN.appendChild(t);
+      }
+    }
+    for (const id in nodes) {
+      const n = nodes[id], x = COL[n.col], y = ROW[n.row];
+      const g = el("g", { class: "node " + n.kind + (n.truth ? " truth" : "") + (n.weak ? " weak" : "") });
+      g.appendChild(el("rect", { x, y, width: W, height: H }));
+      g.appendChild(el("text", { x: x + 10, y: y + 20, class: "t" }, n.title));
+      g.appendChild(el("text", { x: x + 10, y: y + 36, class: "s" }, n.sub));
+      if (n.truth) g.appendChild(el("text", { x: x + W - 8, y: y - 5, class: "badge", "text-anchor": "end" }, "正本"));
+      if (n.note) g.appendChild(el("text", { x: x + 2, y: y + H + 13, class: "note" + (n.noteOk ? " ok" : "") }, n.note));
+      gN.appendChild(g);
+    }
+  }
+
+  draw("flowfig", {
+  "write": {
+    "col": "A",
+    "row": 1,
+    "kind": "bought",
+    "title": "Obsidian で書く",
+    "sub": "公開する記事に 公開: true"
+  },
+  "commit": {
+    "col": "B",
+    "row": 1,
+    "kind": "data",
+    "truth": true,
+    "title": "保管庫でコミット",
+    "sub": "文言が更新履歴になる"
+  },
+  "push": {
+    "col": "C",
+    "row": 1,
+    "kind": "data",
+    "title": "push",
+    "sub": "GitHub の derle-vault へ"
+  },
+  "build": {
+    "col": "D",
+    "row": 1,
+    "kind": "bought",
+    "title": "GitHub Actions",
+    "sub": "自動・選んでビルド"
+  },
+  "site": {
+    "col": "E",
+    "row": 1,
+    "kind": "bought",
+    "title": "出界百科",
+    "sub": "1 分ほどで公開"
+  }
+}, [
+  {
+    "from": "write",
+    "sa": "r",
+    "to": "commit",
+    "sb": "l",
+    "label": ""
+  },
+  {
+    "from": "commit",
+    "sa": "r",
+    "to": "push",
+    "sb": "l",
+    "label": ""
+  },
+  {
+    "from": "push",
+    "sa": "r",
+    "to": "build",
+    "sb": "l",
+    "kind": "new",
+    "label": ""
+  },
+  {
+    "from": "build",
+    "sa": "r",
+    "to": "site",
+    "sb": "l",
+    "kind": "new",
+    "label": ""
+  }
+], [{ row: 1, label: "手でやるのは左の 3 つ。緑の線は自動" }]);
+})();
+</script>
