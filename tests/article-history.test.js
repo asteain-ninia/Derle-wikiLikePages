@@ -1,28 +1,29 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { buildCommitBaseUrl, summarizeArticleHistory, toHistoryMessage } from "../src/lib/article-history.js";
+import { summarizeArticleHistory, toHistoryMessage, toRevisionId } from "../src/lib/article-history.js";
+import { parseCommitLog } from "../scripts/vault-git.mjs";
 
-test("toHistoryMessage は wiki: のコミットだけを載せ、接頭辞を外す", () => {
-  assert.equal(toHistoryMessage({ date: "2026-11-05", message: "wiki: 脱字の修正" }), "脱字の修正");
-  assert.equal(toHistoryMessage({ date: "2026-11-05", message: "WIKI:一括名称変更 旧名→新名" }), "一括名称変更 旧名→新名");
-  assert.equal(toHistoryMessage({ date: "2026-11-05", message: "脱字の修正" }), null);
-  assert.equal(toHistoryMessage({ date: "2026-11-05", message: "content: 外部リンクを直す" }), null);
-  assert.equal(toHistoryMessage({ date: "2026-11-05", message: "wiki:" }), null);
+test("toHistoryMessage は保管庫のコミットを接頭辞なしで載せ、wiki: は外す", () => {
+  assert.equal(toHistoryMessage({ message: "脱字の修正" }), "脱字の修正");
+  assert.equal(toHistoryMessage({ message: "リンク整理: 散文内の重複リンクを初出のみに" }), "リンク整理: 散文内の重複リンクを初出のみに");
+  assert.equal(toHistoryMessage({ message: "wiki: 脱字の修正" }), "脱字の修正");
+  assert.equal(toHistoryMessage({ message: "WIKI:一括名称変更 旧名→新名" }), "一括名称変更 旧名→新名");
+  assert.equal(toHistoryMessage({ message: "wiki:" }), null);
+  assert.equal(toHistoryMessage({ message: "" }), null);
 });
 
-test("toHistoryMessage は保管庫時代 (2026-10-17 より前) のコミットを接頭辞なしでも載せるが、コードの作業は除く", () => {
-  assert.equal(toHistoryMessage({ date: "2026-06-05", message: "リンク整理: 散文内の重複リンクを初出のみに" }), "リンク整理: 散文内の重複リンクを初出のみに");
-  assert.equal(toHistoryMessage({ date: "2026-03-22", message: "feat:手動コミット" }), null);
-  assert.equal(toHistoryMessage({ date: "2026-10-17", message: "refactor: 保管庫を OneDrive の正本に戻す" }), null);
-  assert.equal(toHistoryMessage({ date: "2026-10-17", message: "記事を足す" }), null);
+test("toHistoryMessage は chore: などコードの作業の接頭辞で始まるコミットを載せない", () => {
+  assert.equal(toHistoryMessage({ message: "chore: 公開する記事に 公開: true を付ける" }), null);
+  assert.equal(toHistoryMessage({ message: "feat:手動コミット" }), null);
+  assert.equal(toHistoryMessage({ message: "refactor(vault): 置き場所を変える" }), null);
+  assert.equal(toHistoryMessage({ message: "content: 外部リンクを直す" }), null);
 });
 
 test("summarizeArticleHistory は作成日を全体から、更新日を履歴に載るコミットから取る", () => {
   const summary = summarizeArticleHistory([
-    { date: "2026-11-02", message: "feat: コードの作業" },
-    { date: "2026-11-01", message: "wiki: 脱字の修正" },
-    { date: "2026-10-17", message: "refactor: 作り直し" },
+    { date: "2026-11-02", message: "chore: 公開: true を付ける" },
+    { date: "2026-11-01", message: "脱字の修正" },
     { date: "2026-06-05", message: "インフォボックスを展開" },
     { date: "2026-05-02", message: "ログのためgit化" },
   ]);
@@ -39,7 +40,7 @@ test("summarizeArticleHistory は作成日を全体から、更新日を履歴�
 });
 
 test("summarizeArticleHistory は履歴に載るコミットが無ければ更新日を作成日にする", () => {
-  assert.deepEqual(summarizeArticleHistory([{ date: "2026-11-02", message: "feat: 追加" }]), {
+  assert.deepEqual(summarizeArticleHistory([{ date: "2026-11-02", message: "chore: 追加" }]), {
     created: "2026-11-02",
     updated: "2026-11-02",
     history: [],
@@ -47,24 +48,31 @@ test("summarizeArticleHistory は履歴に載るコミットが無ければ更�
   assert.equal(summarizeArticleHistory([]), null);
 });
 
-test("buildCommitBaseUrl は remote.origin.url の https / ssh の形からコミットのページの URL の頭を作る", () => {
-  const expected = "https://github.com/asteain-ninia/Derle-wikiLikePages/commit";
-  assert.equal(buildCommitBaseUrl("https://github.com/asteain-ninia/Derle-wikiLikePages.git\n"), expected);
-  assert.equal(buildCommitBaseUrl("https://github.com/asteain-ninia/Derle-wikiLikePages"), expected);
-  assert.equal(buildCommitBaseUrl("https://x-access-token:abc@github.com/asteain-ninia/Derle-wikiLikePages"), expected);
-  assert.equal(buildCommitBaseUrl("git@github.com:asteain-ninia/Derle-wikiLikePages.git"), expected);
-  assert.equal(buildCommitBaseUrl("ssh://git@github.com/asteain-ninia/Derle-wikiLikePages.git"), expected);
-  assert.equal(buildCommitBaseUrl(""), null);
-  assert.equal(buildCommitBaseUrl("/local/path/repo"), null);
+test("summarizeArticleHistory は hash があれば古い版のページに使う短い名前を付ける", () => {
+  const commits = [
+    { hash: "aaa1111111222222", date: "2026-11-02", message: "chore: 作業" },
+    { hash: "bbb2222222333333", date: "2026-11-01", message: "脱字の修正" },
+  ];
+  assert.deepEqual(summarizeArticleHistory(commits).history, [
+    { date: "2026-11-01", message: "脱字の修正", revision: "bbb2222222" },
+  ]);
+  assert.equal(toRevisionId("bbb2222222333333"), "bbb2222222");
 });
 
-test("summarizeArticleHistory は commitBaseUrl があれば履歴の各項目にコミットのページの URL を付ける", () => {
-  const commits = [
-    { hash: "aaa111", date: "2026-11-02", message: "feat: コードの作業" },
-    { hash: "bbb222", date: "2026-11-01", message: "wiki: 脱字の修正" },
-  ];
-  assert.deepEqual(summarizeArticleHistory(commits, { commitBaseUrl: "https://github.com/o/r/commit" }).history, [
-    { date: "2026-11-01", message: "脱字の修正", url: "https://github.com/o/r/commit/bbb222" },
+test("parseCommitLog は git log --name-only の出力から、コミットごとのファイルの場所を読む", () => {
+  const output = [
+    "\u0001aaa111\t2026-11-05\t脱字の修正",
+    "",
+    "国/新しい名前.md",
+    "\u0001bbb222\t2026-06-05\tタブ\tを含む文言",
+    "",
+    "国/昔の名前.md",
+    "",
+  ].join("\n");
+
+  assert.deepEqual(parseCommitLog(output), [
+    { hash: "aaa111", date: "2026-11-05", message: "脱字の修正", path: "国/新しい名前.md" },
+    { hash: "bbb222", date: "2026-06-05", message: "タブ\tを含む文言", path: "国/昔の名前.md" },
   ]);
-  assert.deepEqual(summarizeArticleHistory(commits).history, [{ date: "2026-11-01", message: "脱字の修正" }]);
+  assert.deepEqual(parseCommitLog(""), []);
 });

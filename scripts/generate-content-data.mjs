@@ -1,4 +1,3 @@
-import { execFileSync } from "node:child_process";
 import { mkdir, open, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -11,7 +10,8 @@ import {
 import { loadTemplateHandlers } from "../src/lib/template-registry.js";
 import { buildBuildArtifacts } from "../src/lib/build-artifacts.js";
 import { readImageSize } from "../src/lib/image-size.js";
-import { buildCommitBaseUrl, summarizeArticleHistory } from "../src/lib/article-history.js";
+import { summarizeArticleHistory } from "../src/lib/article-history.js";
+import { getVaultCommits, resolveVaultRepository } from "./vault-git.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -60,53 +60,19 @@ async function collectFiles(directoryPath) {
   return collected;
 }
 
-// 原稿ファイルに触れたコミット (新しい順)
-function getGitCommits(repoRelativePath) {
-  try {
-    const output = execFileSync(
-      "git",
-      ["log", "--follow", "--format=%H\t%cs\t%s", "--", repoRelativePath],
-      {
-        cwd: projectRoot,
-        encoding: "utf8",
-        stdio: ["ignore", "pipe", "ignore"],
-      }
-    );
-    return output
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .map((line) => {
-        const [hash, date, ...messageParts] = line.split("\t");
-        return { hash, date, message: messageParts.join("\t") };
-      });
-  } catch {
-    return [];
-  }
+// 履歴は保管庫 (正本) の git から読む。content/ の原稿は保管庫と同じ相対パスに置かれている
+const vaultRepository = await resolveVaultRepository();
+if (!vaultRepository) {
+  console.log("  保管庫の git が見つからないため、更新履歴は付けず、日付はファイルのものを使います");
 }
 
-// 更新履歴の文言からそのコミットのページへリンクする (Actions の checkout でも origin は GitHub の URL)
-function getCommitBaseUrl() {
-  try {
-    const remoteUrl = execFileSync("git", ["config", "--get", "remote.origin.url"], {
-      cwd: projectRoot,
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
-    });
-    return buildCommitBaseUrl(remoteUrl);
-  } catch {
-    return null;
-  }
-}
-
-const commitBaseUrl = getCommitBaseUrl();
-
-// 作成日・更新日・更新履歴。履歴に載るのは wiki: のコミットと保管庫時代のコミットだけ (src/lib/article-history.js)。
-// まだコミットされていない原稿はファイルの日付を使う
-async function getFileHistory(absolutePath, repoRelativePath) {
-  const summary = summarizeArticleHistory(getGitCommits(repoRelativePath), { commitBaseUrl });
+// 作成日・更新日・更新履歴 (src/lib/article-history.js)。commits は古い版のページを作るのにも使う。
+// 保管庫でまだコミットされていない原稿はファイルの日付を使う
+async function getFileHistory(absolutePath, vaultRelativePath) {
+  const commits = getVaultCommits(vaultRepository, vaultRelativePath);
+  const summary = summarizeArticleHistory(commits);
   if (summary) {
-    return summary;
+    return { ...summary, commits };
   }
 
   const fileStats = await stat(absolutePath);
@@ -114,6 +80,7 @@ async function getFileHistory(absolutePath, repoRelativePath) {
     created: formatDate(fileStats.birthtimeMs || fileStats.ctimeMs || fileStats.mtimeMs),
     updated: formatDate(fileStats.mtimeMs),
     history: [],
+    commits: [],
   };
 }
 
@@ -160,7 +127,6 @@ async function buildContentData() {
 
   for (const absolutePath of markdownFiles) {
     const relativeToContent = toPosixPath(path.relative(contentRoot, absolutePath));
-    const repoRelativePath = toPosixPath(path.relative(projectRoot, absolutePath));
     const fileBasename = path.basename(absolutePath, path.extname(absolutePath));
     const sourceText = await readFile(absolutePath, "utf8");
     if (!checkPublication(sourceText).published) {
@@ -169,7 +135,7 @@ async function buildContentData() {
       continue;
     }
 
-    const { created, updated, history } = await getFileHistory(absolutePath, repoRelativePath);
+    const { created, updated, history } = await getFileHistory(absolutePath, relativeToContent);
 
     const record = buildArticleRecord({
       relativePath: relativeToContent,
