@@ -1,3 +1,21 @@
+import { getDerleSystem } from "./loom/system.js";
+import { formatQuantity } from "./loom/quantities.js";
+
+// 出界の織機のテンプレートを展開する。
+// {{織機|量|単位|有効数字}} はビルド時の計算値 (文字列) に置き換える。設定が変わっても記事の値が追従する。
+// {{計算機|種類}} は行ごと計算機のブロックにする (行頭の印 U+0000 CALC: … を buildParagraphs が拾う)。
+// 行に単独で書かれていない {{計算機}} (箇条書きの中・文の途中・表の中) は、目に見える印にする。
+// コードスパン (`…`) の中も展開される。展開させたくないときは <nowiki> で囲む。
+export function expandLoomTemplates(text) {
+  return text
+    .replace(/\{\{織機\|([^{}|]+)(?:\|([^{}|]*))?(?:\|\s*(\d+)\s*)?\}\}/g, (_match, name, unit, sig) => {
+      const { system, units } = getDerleSystem();
+      return formatQuantity(system, units, name.trim(), (unit ?? "").trim(), sig ? Number(sig) : 4);
+    })
+    .replace(/^[ \t]*\{\{計算機\|([^{}|]+)\}\}[ \t\r]*$/gm, (_match, kind) => `\x00CALC:${kind.trim()}\x00`)
+    .replace(/\{\{計算機\|([^{}|]+)\}\}/g, (_match, kind) => `〔計算機「${kind.trim()}」は行に単独で書く〕`);
+}
+
 function normalizeNewlines(value) {
   // 先頭の BOM も落とす (BOM 付きだと frontmatter や未査読コールアウトの判定を外すため)
   return String(value).replace(/^﻿/, "").replace(/\r\n?/g, "\n");
@@ -1152,6 +1170,14 @@ function buildParagraphs(lines) {
       continue;
     }
 
+    const calcMatch = /^\x00CALC:(.+?)\x00$/.exec(trimmed);
+    if (calcMatch) {
+      flushParagraph();
+      paragraphs.push({ type: "calculator", kind: calcMatch[1].trim() });
+      lineIndex += 1;
+      continue;
+    }
+
     const mainMatch = /^\x00MAIN:(.+?)\x00(.*)$/.exec(trimmed);
     if (mainMatch) {
       flushParagraph();
@@ -1476,7 +1502,8 @@ export function buildArticleRecord({
   const { isRedirect, redirectTarget } = processRedirect(sourceWithoutFrontmatter);
   const { text: nowikiProcessed, placeholders: nowikiPlaceholders } =
     processNowiki(sourceWithoutFrontmatter);
-  const magicStripped = stripMagicWords(nowikiProcessed);
+  // 織機のテンプレートは、冒頭のテンプレート (インフォボックスなど) として抜き出される前に展開する
+  const magicStripped = expandLoomTemplates(stripMagicWords(nowikiProcessed));
   const { templates, body: bodyWithoutLeadingTemplates } =
     extractLeadingTemplates(magicStripped);
   const { text: bodyWithoutCategories, categoryTags } =
